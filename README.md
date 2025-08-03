@@ -1,7 +1,7 @@
 ## **SpadisQT App for ADAPS ADS6401 dToF Sensor**
 ([Chinese version](README_zh_CN.md))
 
-This is a demo application for the ADS6401 dToF sensor, named 'SpadisQT', designed to run on embedded Linux systems.
+This is a demo application for the ADS6401 dToF sensor from [ADAPS Photonics](https://adapsphotonics.com/), named 'SpadisQT', designed to run on embedded Linux systems.
 
 Using the V4L2 framework, the raw MIPI data from our Swift dToF sensor is captured, processed by our proprietary algorithm library, 
 and converted into depth or grayscale data. The depth information is then visualized in RGB colors for enhanced interpretation.
