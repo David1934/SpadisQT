@@ -1,4 +1,5 @@
 ## **SpadisQT App for ADAPS ADS6401 dToF Sensor**
+([Chinese version](README_zh_CN.md))
 
 This is a demo application for the ADS6401 dToF sensor, named 'SpadisQT', designed to run on embedded Linux systems.
 
