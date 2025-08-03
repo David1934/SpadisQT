@@ -62,5 +62,6 @@ For questions, contact us: [ADAPS Photonics](https://adapsphotonics.com/).
 SpadisQT is licensed under:
 
 [GNU LGPLv3](https://opensource.org/licenses/LGPL-3.0)
+
 [QT LGPL](https://doc.qt.io/archives/qt-5.15/lgpl.html)
 
