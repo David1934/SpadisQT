@@ -28,22 +28,10 @@ FrameProcessThread::FrameProcessThread()
     if (SENSOR_TYPE_DTOF == sns_param.sensor_type)
     {
         sns_param.work_mode = qApp->get_wk_mode();
-    #if 0
-        if (WK_DTOF_FHR == sns_param.work_mode)
-        {
-            sns_param.env_type = AdapsEnvTypeOutdoor;
-            sns_param.measure_type = AdapsMeasurementTypeFull;
-        }
-        else {
-            sns_param.env_type = AdapsEnvTypeIndoor; // PCM mode can't use Outdoor mode, othersize the temperature maybe increase very fast.
-            sns_param.measure_type = AdapsMeasurementTypeNormal;
-        }
-    #else
         sns_param.env_type = qApp->get_environment_type();
         sns_param.measure_type = qApp->get_measurement_type();
         sns_param.framerate_type = qApp->get_framerate_type();
         sns_param.power_mode = qApp->get_power_mode();
-    #endif
 
         utils = new Utils();
         v4l2 = new V4L2(sns_param);
@@ -372,17 +360,6 @@ bool FrameProcessThread::new_frame_handle(
                 }
                 else {
                     decodeRet = adaps_dtof->dtof_frame_decode(frm_sequence, (unsigned char *)frm_rawdata, buf_len, depth_buffer, sns_param.work_mode);
-
-#if 0 // Don't check md5 for the decoded sub-frame buffer.
-                    if (NULL_POINTER != expected_md5_string)
-                    {
-                        utils->MD5Calculate((const unsigned char *) depth_buffer, 
-                            depth_buffer_size,
-                            __FUNCTION__,
-                            frm_sequence
-                            );
-                    }
-#endif
 
 #if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)
                     if (frm_sequence < 80 && frm_sequence > 34)

@@ -121,17 +121,10 @@ private:
     u16 m_LimitedMaxDistance;
     u16 m_rangeHigh;
     u16 m_rangeLow;
-#if 1
+
     void *m_handlerDepthLib;
     char m_DepthLibversion[32];
     char m_DepthLibConfigXmlPath[128];
-#else
-    CHILIBRARYHANDLE       m_hDepthLib;
-    CREATEDEPTHMAPWRAPPER  m_createDepthMapWrapper;
-    DESTROYDEPTHMAPWRAPPER m_destroyDepthMapWrapper;
-    PROCESSFRAME           m_processFrame;
-    DepthMapWrapper*      m_DepthMapWrapper;
-#endif
     bool m_conversionLibInited;
     uint32_t m_decoded_frame_cnt;
     uint32_t m_decoded_success_frame_cnt;
