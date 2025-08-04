@@ -132,7 +132,6 @@ Misc_Device::Misc_Device()
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
         + (PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROTATION_GROUP_CNT);
-//    eeprom_data_size = sizeof(swift_eeprom_data_t);
     memset((void *) &last_runtime_status_param, 0, sizeof(struct adaps_dtof_runtime_status_param));
     fd_4_misc = 0;
     memset(devnode_4_misc, 0, DEV_NODE_LEN);

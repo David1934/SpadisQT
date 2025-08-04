@@ -19,6 +19,8 @@ There are two types of dToF modules based on the ADS6401 chip:
 
 The Linux kernel driver (`ads6401`) reports the module type when the `ADAPS_GET_DTOF_MODULE_STATIC_DATA` ioctl command is executed.
 
+![SpadisQT](vx_images/172133286252452.png)
+
 ### **Deployment Steps**  
 Follow these steps to deploy SpadisQT to your development board:
 

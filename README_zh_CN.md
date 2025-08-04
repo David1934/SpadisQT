@@ -17,6 +17,7 @@ ADS6401 芯片支持两种 dToF 模块：
 
 当执行 `ADAPS_GET_DTOF_MODULE_STATIC_DATA` ioctl 命令时，Linux 内核驱动（`ads6401`）会返回当前模块类型。
 
+![SpadisQT_screenshot](vx_images/47092456821829.png)
 ### **部署步骤**  
 按以下步骤将 SpadisQT 部署到开发板：
 
