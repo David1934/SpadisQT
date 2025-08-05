@@ -923,9 +923,11 @@ int Misc_Device::read_dtof_module_static_data(void)
             if (MODULE_TYPE_SPOT == module_static_data.module_type)
             {
                 p_spot_module_eeprom = (swift_spot_module_eeprom_data_t *) mapped_eeprom_data_buffer;
+                qApp->set_anchorOffset(0, 1); // set default anchor Offset for spot module, can be changed from PC SpadisApp.
             }
             else {
                 p_flood_module_eeprom = (swift_flood_module_eeprom_data_t *) mapped_eeprom_data_buffer;
+                qApp->set_anchorOffset(0, 0); // non-spot module does not need anchor preprocess
             }
 
             if (false == Utils::is_env_var_true(ENV_VAR_SKIP_EEPROM_CRC_CHK))

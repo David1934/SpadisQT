@@ -705,7 +705,7 @@ void FrameProcessThread::run()
                 /// }
                 ret=v4l2->Capture_frame();
                 sleeping = true;
-                QThread::usleep(FRAME_INTERVAL_US);
+                QThread::usleep(FRAME_PROCESS_THREAD_INTERVAL_US);
                 sleeping = false;
             }
 

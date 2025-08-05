@@ -13,8 +13,8 @@
 
 #define VERSION_MAJOR                           3
 #define VERSION_MINOR                           2
-#define VERSION_REVISION                        4
-#define LAST_MODIFIED_TIME                      "202500802A"
+#define VERSION_REVISION                        5
+#define LAST_MODIFIED_TIME                      "202500805A"
 
 #define DEFAULT_DTOF_FRAMERATE                  AdapsFramerateType30FPS // AdapsFramerateType60FPS
 
@@ -22,7 +22,7 @@
 #define DATA_SAVE_PATH                          "/tmp/" // "/sdcard/"
 #define DEFAULT_SAVE_FRAME_CNT                  0
 #define RTCTIME_DISPLAY_FMT                     "hh:mm:ss"  // "yyyy/MM/dd hh:mm:ss"
-#define FRAME_INTERVAL_US                       10   // unit is us
+#define FRAME_PROCESS_THREAD_INTERVAL_US        10   // unit is us
 
 // query the video node by the command 'v4l2-ctl --list-devices' or 'media-ctl -p -d /dev/media0'
 
@@ -54,7 +54,6 @@
 #define WAIT_TIME_4_THREAD_EXIT                 10  // unit is  milliseconds
 
 #if defined(RUN_ON_EMBEDDED_LINUX)
-    #define DEFAULT_CFG_4_COWORK_WITH_HOST      true
     #define DEFAULT_SENSOR_TYPE                 SENSOR_TYPE_DTOF
     #define DEFAULT_ENVIRONMENT_TYPE            AdapsEnvTypeIndoor
     #define DEFAULT_MEASUREMENT_TYPE            AdapsMeasurementTypeFull
@@ -63,7 +62,6 @@
     #define FLOOD_MODULE_TYPE_NAME              "Flood"
 #else
     #define DEFAULT_SENSOR_TYPE                 SENSOR_TYPE_RGB
-    #define DEFAULT_CFG_4_COWORK_WITH_HOST      false
 #endif
 
 #define WKMODE_4_RGB_SENSOR                     WK_RGB_YUYV    // On DELL notebook, it is WK_MODE_YUYV, on Apple notebook it is WK_MODE_NV12?
