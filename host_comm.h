@@ -26,7 +26,7 @@ public:
 
     int report_frame_raw_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
     int report_frame_depth16_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
-    void get_backuped_external_config_info(UINT8 *workmode, UINT8 ** script_buffer, uint32_t *script_buffer_size, UINT8 ** roisram_data, uint32_t *roisram_data_size, bool *roi_sram_rotate);
+    void get_backuped_external_config_info(UINT8 *workmode, UINT8 ** script_buffer, uint32_t *script_buffer_size, UINT8 ** roisram_data, uint32_t *roisram_data_size, bool *roi_sram_rolling);
     int report_status(UINT16 responsed_cmd, UINT16 status_code, char *msg, int msg_length);
     UINT8 get_req_out_data_type();
     UINT8 get_req_walkerror_enable();
@@ -34,6 +34,8 @@ public:
     BOOLEAN get_req_expand_pixel();
     BOOLEAN get_req_mirror_x();
     BOOLEAN get_req_mirror_y();
+    void* get_loaded_ref_distance_data();
+    void* get_loaded_lens_intrinsic_data();
 
     // 获取单例实例
     static Host_Communication* getInstance();
@@ -54,12 +56,14 @@ private:
     UINT8 backuped_wkmode;
     UINT32 backuped_roisram_data_size;
     UINT8 *backuped_roisram_data;     // roisram_data backuped from CMD_HOST_SIDE_SET_ROI_SRAM_DATA
-    bool backuped_roi_sram_rotate;
+    bool backuped_roi_sram_rolling;
     capture_req_param_t backuped_capture_req_param;
     UINT32 loaded_walkerror_data_size;
     UINT8 *loaded_walkerror_data;     // roisram_data backuped from CMD_HOST_SIDE_SET_SPOT_WALKERROR_DATA
     UINT32 loaded_spotoffset_data_size;
     UINT8 *loaded_spotoffset_data;
+    float *loaded_ref_distance_data;     // roisram_data backuped from CMD_HOST_SIDE_SET_REF_DISTANCE_DATA
+    float *loaded_lens_intrinsic_data;     // roisram_data backuped from CMD_HOST_SIDE_SET_LENS_INTRINSIC_DATA
     UINT32 eeprom_capacity;       // unit is byte
     Misc_Device *p_misc_device;
 
@@ -84,6 +88,8 @@ private:
     void adaps_update_eeprom_data(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_request_device_reboot(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_set_rtc_time(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void adaps_load_ref_distance_data(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void adaps_load_lens_intrinsic_data(CommandData_t* pCmdData, uint32_t rxDataLen);
 
     void adaps_event_process(void* pRXData, uint32_t rxDataLen);
     void adaps_sender_disconnected(void);
@@ -94,8 +100,8 @@ private:
     int dump_frame_param(frame_buffer_param_t *pDataBufferParam);
     int dump_module_static_data(module_static_data_t *pStaticDataParam);
     void backup_roi_sram_data(roisram_data_param_t* pRoiSramParam);
-#if defined(ROI_SRAM_DATA_INJECTION_4_ROISRAM_ROTATE_TEST)
-    int roi_sram_rotate_data_injection();
+#if defined(ROI_SRAM_DATA_INJECTION_4_ROLLING_ROTATE_TEST)
+    int roi_sram_rolling_data_injection();
 #endif
 
 };

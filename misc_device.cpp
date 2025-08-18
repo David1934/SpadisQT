@@ -126,7 +126,7 @@ Misc_Device::Misc_Device()
     sensor_reg_setting_cnt = 0;
     vcsel_reg_setting_cnt = 0;
     loaded_roi_sram_size = 0;
-    loaded_roi_sram_rotate = false;
+    loaded_roi_sram_rolling = false;
     // mmap_buffer_max_size should be a multiple of PAGE_SIZE (4096, for Linux kernel memory management)
     mmap_buffer_max_size = MAX(SPOT_MODULE_EEPROM_CAPACITY_SIZE,FLOOD_MODULE_EEPROM_CAPACITY_SIZE)
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
@@ -364,7 +364,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
     vcsel_reg_setting_cnt = 0;
     sensor_settings = (struct setting_rvd *) mapped_script_sensor_settings;
     memset(mapped_script_sensor_settings, 0, sizeof(struct setting_rvd)*MAX_REG_SETTING_COUNT);
-    if (MODULE_TYPE_SPOT == module_static_data.module_type)
+    if (MODULE_TYPE_FLOOD != module_static_data.module_type)
     {
         vcsel_opn7020_settings = (struct setting_rvd *) mapped_script_vcsel_settings;
         memset(mapped_script_vcsel_settings, 0, sizeof(struct setting_rvd)*MAX_REG_SETTING_COUNT);
@@ -394,7 +394,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
                 }
                 sensor_reg_setting_cnt++;
             }
-            else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i].i2c_addr) && (MODULE_TYPE_SPOT == module_static_data.module_type))
+            else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i].i2c_addr) && (MODULE_TYPE_FLOOD != module_static_data.module_type))
             {
                 vcsel_opn7020_settings[vcsel_reg_setting_cnt].reg = pstrItems[i].reg_addr;
                 vcsel_opn7020_settings[vcsel_reg_setting_cnt].val = pstrItems[i].reg_val;
@@ -431,7 +431,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
                         }
                     }
                 }
-                else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i - 1].i2c_addr) && (MODULE_TYPE_SPOT == module_static_data.module_type))
+                else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i - 1].i2c_addr) && (MODULE_TYPE_FLOOD != module_static_data.module_type))
                 {
                     if (vcsel_reg_setting_cnt > 1)
                     {
@@ -463,7 +463,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
     sensor_settings[sensor_reg_setting_cnt].delayUs = 0;
     sensor_reg_setting_cnt++;
 
-    if (MODULE_TYPE_SPOT == module_static_data.module_type)
+    if (MODULE_TYPE_FLOOD != module_static_data.module_type)
     {
         vcsel_opn7020_settings[vcsel_reg_setting_cnt].reg = REG_NULL;
         vcsel_opn7020_settings[vcsel_reg_setting_cnt].val = 0x00;
@@ -479,7 +479,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
     return 0;
 }
 
-int Misc_Device::send_down_external_config(const UINT8 workMode, const uint32_t script_buf_size, const uint8_t* script_buf, const uint32_t roi_sram_size, const uint8_t* roi_sram_data, const bool roi_sram_rotate)
+int Misc_Device::send_down_external_config(const UINT8 workMode, const uint32_t script_buf_size, const uint8_t* script_buf, const uint32_t roi_sram_size, const uint8_t* roi_sram_data, const bool roi_sram_rolling)
 {
     ScriptItem *pstrItems = NULL_POINTER;
     uint32_t ulItemsBufSize = MAX_SCRIPT_ITEM_COUNT * sizeof(ScriptItem);
@@ -520,16 +520,16 @@ int Misc_Device::send_down_external_config(const UINT8 workMode, const uint32_t 
 
     memcpy(mapped_roi_sram_data, roi_sram_data, roi_sram_size);
     loaded_roi_sram_size = roi_sram_size;
-    loaded_roi_sram_rotate = roi_sram_rotate;
+    loaded_roi_sram_rolling = roi_sram_rolling;
 
     ex_cfg_script_param.work_mode = workMode;
     ex_cfg_script_param.sensor_reg_setting_cnt = sensor_reg_setting_cnt;
     ex_cfg_script_param.vcsel_reg_setting_cnt = vcsel_reg_setting_cnt;
-    ex_cfg_script_param.roi_sram_rotate = roi_sram_rotate;
+    ex_cfg_script_param.roi_sram_rolling = roi_sram_rolling;
     ex_cfg_script_param.roi_sram_size = roi_sram_size;
     ret = write_external_config_script(&ex_cfg_script_param);
-    DBG_NOTICE("write_external_config_script() ret: %d, workMode: %d, vcsel_reg_setting_cnt:%d, sensor_reg_setting_cnt: %d, roi_sram_rotate: %d, roi_sram_size: %d---\n",
-        ret, workMode, vcsel_reg_setting_cnt, sensor_reg_setting_cnt, roi_sram_rotate, roi_sram_size);
+    DBG_NOTICE("write_external_config_script() ret: %d, workMode: %d, vcsel_reg_setting_cnt:%d, sensor_reg_setting_cnt: %d, roi_sram_rolling: %d, roi_sram_size: %d---\n",
+        ret, workMode, vcsel_reg_setting_cnt, sensor_reg_setting_cnt, roi_sram_rolling, roi_sram_size);
 
     return ret;
 }
@@ -646,8 +646,12 @@ void* Misc_Device::get_dtof_calib_eeprom_param(void)
     {
         return p_spot_module_eeprom;
     }
-    else {
+    else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
         return p_flood_module_eeprom;
+    }
+    else {
+        //return NULL; // TODO: add eeprom for big fov flood module
+        return p_spot_module_eeprom;
     }
 
 }
@@ -923,10 +927,15 @@ int Misc_Device::read_dtof_module_static_data(void)
             if (MODULE_TYPE_SPOT == module_static_data.module_type)
             {
                 p_spot_module_eeprom = (swift_spot_module_eeprom_data_t *) mapped_eeprom_data_buffer;
-                qApp->set_anchorOffset(0, 1); // set default anchor Offset for spot module, can be changed from PC SpadisApp.
+                qApp->set_anchorOffset(0, 1); // set default anchor Offset (in case no host_comm) for spot module, may be changed from PC SpadisApp.
+            }
+            else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
+                p_flood_module_eeprom = (swift_flood_module_eeprom_data_t *) mapped_eeprom_data_buffer;
+                qApp->set_anchorOffset(0, 0); // non-spot module does not need anchor preprocess
             }
             else {
-                p_flood_module_eeprom = (swift_flood_module_eeprom_data_t *) mapped_eeprom_data_buffer;
+                // TODO for big FoV module
+                p_spot_module_eeprom = (swift_spot_module_eeprom_data_t *) mapped_eeprom_data_buffer;
                 qApp->set_anchorOffset(0, 0); // non-spot module does not need anchor preprocess
             }
 
@@ -937,8 +946,12 @@ int Misc_Device::read_dtof_module_static_data(void)
                     ret = check_crc8_4_spot_calib_eeprom_param();
                     ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
                 }
-                else {
+                else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
                     ret = check_crc32_4_flood_calib_eeprom_param();
+                    ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
+                }
+                else {
+                    // TODO for big FoV module
                     ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
                 }
             }
@@ -956,8 +969,12 @@ int Misc_Device::get_dtof_module_static_data(void **pp_module_static_data, void 
     {
         *eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
     }
-    else {
+    else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
         *eeprom_data_size = sizeof(swift_flood_module_eeprom_data_t);
+    }
+    else {
+        // TODO for big FoV module
+        *eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
     }
 
     return 0;

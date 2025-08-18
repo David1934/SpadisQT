@@ -128,12 +128,12 @@ private:
     bool m_conversionLibInited;
     uint32_t m_decoded_frame_cnt;
     uint32_t m_decoded_success_frame_cnt;
-    uint32_t dump_walkerror_param_cnt;
     WrapperDepthOutput depthOutputs[MAX_DEPTH_OUTPUT_FORMATS];
     WrapperDepthInput depthInput;
     WrapperDepthCamConfig depthConfig;
     FrameLossChecker checker;
     void* loaded_roi_sram_data;
+    uint8_t* copied_roisram_4_anchorX;
     uint32_t loaded_roi_sram_size;
 
 #if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)

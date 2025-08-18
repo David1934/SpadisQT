@@ -713,8 +713,11 @@ bool MainWindow::update_status_info(status_params2 param2)
         {
             ui->cur_module_type_value->setText(SPOT_MODULE_TYPE_NAME);
         }
-        else {
+        else if (MODULE_TYPE_FLOOD == qApp->get_module_type()) {
             ui->cur_module_type_value->setText(FLOOD_MODULE_TYPE_NAME);
+        }
+        else {
+            ui->cur_module_type_value->setText(BIG_FOV_FLOOD_MODULE_TYPE_NAME);
         }
 
     #if defined(CONFIG_ADAPS_SWIFT_FLOOD)

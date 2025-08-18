@@ -41,6 +41,8 @@ typedef enum
     CMD_HOST_SIDE_SET_DEVICE_REBOOT                 = 0x000E,
     CMD_HOST_SIDE_SET_RTC_TIME                      = 0x000F,
     CMD_HOST_SIDE_SET_EXPOSURE_TIME                 = 0x0010,
+    CMD_HOST_SIDE_SET_REF_DISTANCE_DATA             = 0x0011,
+    CMD_HOST_SIDE_SET_LENS_INTRINSIC_DATA           = 0x0012,
 
     // from device side to PC side
     CMD_DEVICE_SIDE_REPORT_MODULE_STATIC_DATA       = 0x1000, // Device side sends the static_module data as requested by the client's CMD_HOST_SIDE_GET_MODULE_STATIC_DATA command
@@ -68,6 +70,7 @@ typedef enum
     CMD_DEVICE_SIDE_ERROR_FAIL_TO_UPDATE_EEPROM     = 0x000A,
     CMD_DEVICE_SIDE_ERROR_INVALID_EEPROM_UPD_PARAM  = 0x000B,
     CMD_DEVICE_SIDE_ERROR_INVALID_REBOOT_REASON     = 0x000C,
+    CMD_DEVICE_SIDE_ERROR_CHKSUM_MISMATCH_IN_EEPROM = 0x000D,
 } error_code_t;
 
 typedef enum
@@ -133,7 +136,7 @@ typedef struct walkerror_enable_param
 
 typedef struct roisram_data_param
 {
-    BOOLEAN                 roi_sram_rotate;
+    BOOLEAN                 roi_sram_rolling;
     UINT32                  roisram_data_size;      // roi sram buffer size to be loaded, it should be an integer multiple of (PER_ROI_SRAM_MAX_SIZE * ZONE_COUNT_PER_SRAM_GROUP) or 0, 
                                                     // it shoud <= (PER_ROI_SRAM_MAX_SIZE * ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROTATION_GROUP_CNT) 
     CHAR                    roisram_data[0];        // loaded roi sram buffer, No this member if roisram_data_size == 0
@@ -157,6 +160,19 @@ typedef struct eeprom_data_update_param
     UINT32                  length;                //eeprom data length
     CHAR                    eeprom_data[0];        // eeprom data buffer to be updated, No this member if length == 0
 } eeprom_data_update_param_t;
+
+typedef struct lens_intrinsic_data_param
+{
+    float           intrinsic[9]; // 36 bytes
+} lens_intrinsic_data_param_t;
+
+typedef struct reference_distance_data_param
+{
+    float           indoorCalibTemperature; // Calibration temperature.
+    float           outdoorCalibTemperature; // Calibration temperature.
+    float           indoorCalibRefDistance; // Calibration reference distance.
+    float           outdoorCalibRefDistance; // Calibration reference distance.
+} reference_distance_data_param_t;
 
 typedef struct capture_req_param
 {
@@ -212,7 +228,7 @@ typedef struct frame_buffer_param_s
 typedef struct module_static_data_s
 {
     UINT8                   data_type;              // refer to enum swift_data_type of this .h file
-    UINT32                  module_type;            // refer to ADS6401_MODULE_SPOT and ADS6401_MODULE_FLOOD of adaps_types.h file
+    UINT32                  module_type;            // refer to ADS6401_MODULE_SPOT,ADS6401_MODULE_FLOOD and ADS6401_MODULE_BIG_FOV_FLOOD of adaps_types.h file
     UINT32                  eeprom_capacity;        // unit is byte
     UINT16                  otp_vbe25;
     UINT16                  otp_vbd;        // unit is 10mv, or the related V X 100

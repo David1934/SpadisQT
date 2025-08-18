@@ -43,6 +43,7 @@ GlobalApplication::GlobalApplication(int argc, char *argv[]):QCoreApplication(ar
 #if defined(RUN_ON_EMBEDDED_LINUX)
     parser.addOption(environment_type_opt);
     parser.addOption(measurement_type_opt);
+    parser.addOption(power_mode_opt);
     //parser.addOption(no_host_comm_opt);
     //parser.addOption(output_data_type_opt);
 #endif
@@ -69,7 +70,7 @@ GlobalApplication::GlobalApplication(int argc, char *argv[]):QCoreApplication(ar
     selected_framerate_type = DEFAULT_DTOF_FRAMERATE;
     selected_power_mode = AdapsPowerModeNormal;
     capture_req_from_host = false;
-    roi_sram_rotate = false;
+    roi_sram_rolling = false;
     loaded_walkerror_data = nullptr;
     loaded_walkerror_data_size = 0;
     loaded_spotoffset_data = nullptr;
@@ -80,6 +81,9 @@ GlobalApplication::GlobalApplication(int argc, char *argv[]):QCoreApplication(ar
     anchor_rowOffset = 0;
     rowSearchingRange = 2;
     colSearchingRange = 2;
+    usrCfgGrayExposure = 0;
+    usrCfgCoarseExposure = 0;
+    usrCfgFineExposure = 0;
 #endif
 
     //DBG_INFO( "---------------");
@@ -216,16 +220,16 @@ int GlobalApplication::set_capture_req_from_host(bool val)
     return ret;
 }
 
-bool GlobalApplication::is_roi_sram_rotate()
+bool GlobalApplication::is_roi_sram_rolling()
 {
-    return roi_sram_rotate;
+    return roi_sram_rolling;
 }
 
-int GlobalApplication::set_roi_sram_rotate(bool val)
+int GlobalApplication::set_roi_sram_rolling(bool val)
 {
     int ret = 0;
 
-    roi_sram_rotate = val;
+    roi_sram_rolling = val;
 
     return ret;
 }
@@ -486,6 +490,28 @@ int GlobalApplication::set_spotSearchingRange(UINT8 rowRange, UINT8 colRange)
 
     rowSearchingRange = rowRange;
     colSearchingRange = colRange;
+
+    return ret;
+}
+
+int GlobalApplication::get_usrCfgExposureValues(UINT8 *coarseExposure, UINT8 *fineExposure, UINT8 *grayExposure)
+{
+    int ret = 0;
+
+    *coarseExposure = usrCfgCoarseExposure;
+    *fineExposure = usrCfgFineExposure;
+    *grayExposure = usrCfgGrayExposure;
+
+    return ret;
+}
+
+int GlobalApplication::set_usrCfgExposureValues(UINT8 coarseExposure, UINT8 fineExposure, UINT8 grayExposure)
+{
+    int ret = 0;
+
+    usrCfgCoarseExposure = coarseExposure;
+    usrCfgFineExposure = fineExposure;
+    usrCfgGrayExposure = grayExposure;
 
     return ret;
 }

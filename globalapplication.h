@@ -63,8 +63,8 @@ public:
     float get_RealDistanceMaxMappedRange();
     int set_RealDistanceMaxMappedRange(float value);
 
-    bool is_roi_sram_rotate();
-    int set_roi_sram_rotate(bool val);
+    bool is_roi_sram_rolling();
+    int set_roi_sram_rolling(bool val);
 
     UINT8* get_loaded_walkerror_data();
     int set_loaded_walkerror_data(UINT8* value);
@@ -87,6 +87,8 @@ public:
 
     int get_spotSearchingRange(UINT8 *rowSearchingRange, UINT8 *colSearchingRange);
     int set_spotSearchingRange(UINT8 rowSearchingRange, UINT8 colSearchingRange);
+    int get_usrCfgExposureValues(UINT8 *coarseExposure, UINT8 *fineExposure, UINT8 *grayExposure);
+    int set_usrCfgExposureValues(UINT8 coarseExposure, UINT8 fineExposure, UINT8 grayExposure);
 #endif
 
 private:
@@ -105,7 +107,7 @@ private:
     AdapsFramerateType selected_framerate_type;
     AdapsPowerMode selected_power_mode;
     bool            capture_req_from_host;
-    bool            roi_sram_rotate;
+    bool            roi_sram_rolling;
     bool            walkerror_enable;
     int GrayScaleMinMappedRange;
     int GrayScaleMaxMappedRange;
@@ -120,6 +122,9 @@ private:
     UINT8 anchor_colOffset;
     UINT8 rowSearchingRange;
     UINT8 colSearchingRange;
+    UINT8 usrCfgGrayExposure;
+    UINT8 usrCfgCoarseExposure;
+    UINT8 usrCfgFineExposure;
 
     AdapsMeasurementType string_2_measurementtype(QString& str);
     AdapsEnvironmentType string_2_environmenttype(QString& str);

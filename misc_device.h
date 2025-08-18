@@ -71,7 +71,7 @@ public:
     int read_dtof_exposure_param(void);
     int write_dtof_initial_param(struct adaps_dtof_intial_param *param);
     int get_dtof_module_static_data(void **pp_module_static_data, void **pp_eeprom_data_buffer, uint32_t *eeprom_data_size);
-    int send_down_external_config(const UINT8 workMode, const uint32_t script_buf_size, const uint8_t* script_buf, const uint32_t roi_sram_size, const uint8_t* roi_sram_data, const bool roi_sram_rotate);
+    int send_down_external_config(const UINT8 workMode, const uint32_t script_buf_size, const uint8_t* script_buf, const uint32_t roi_sram_size, const uint8_t* roi_sram_data, const bool roi_sram_rolling);
     int get_loaded_roi_sram_data_info(void **pp_roisram_data_buffer, uint32_t *roisram_data_size);
     int update_eeprom_data(UINT8 *buf, UINT32 offset, UINT32 length);
 
@@ -95,7 +95,7 @@ private:
     u8* mapped_script_vcsel_settings;           // opn7020 for spot module, PhotonIC5015 for flood module
     u8* mapped_roi_sram_data;
     u32 loaded_roi_sram_size;
-    bool loaded_roi_sram_rotate;
+    bool loaded_roi_sram_rolling;
 
     int read_dtof_module_static_data(void);
     int check_crc32_4_flood_calib_eeprom_param(void);

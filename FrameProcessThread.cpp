@@ -1,3 +1,4 @@
+#include <poll.h>
 #include <mainwindow.h>
 #include <globalapplication.h>
 
@@ -687,39 +688,64 @@ void FrameProcessThread::run()
 {
     int ret = 0;
     /// static int run_times = 0;
+    int fd = v4l2->get_videodev_fd();
+
+    // 使用poll监听设备fd，设置100ms超时，避免ioctl无限阻塞
+     struct pollfd fds[1];
+     fds[0].fd = fd;
+     fds[0].events = POLLIN; // 等待数据可读
 
     if(majorindex != -1)
     {
         while(!stopped)
         {
-            if (this->isInterruptionRequested()) {
-                 DBG_NOTICE("Thread is interrupted, cleaning up...");
-                 break;
-             }
-
             if(!stopped)
             {
                 /// if (run_times < 1)
                 /// {
                 ///     utils->GetPidTid(__FUNCTION__, __LINE__);
                 /// }
-                ret=v4l2->Capture_frame();
+
+                 ret = poll(fds, 1, 100); // 超时100ms
+                 if (ret <= 0) {
+                     if (ret < 0)
+                     {
+                         qWarning() << "poll error:" << strerror(errno);
+                         break;
+                     }
+                     if (stopped)
+                     {
+                        stop(STOP_REQUEST_STOP);
+                        break; // 被信号中断，且需要退出
+                     }
+
+                     //continue;
+                 }
+                 else {
+                     // 确认有数据可读，再调用DQBUF
+                     if (fds[0].revents & POLLIN)
+                     {
+                         ret=v4l2->Capture_frame();
+
+                         if(ret < 0)
+                         {
+                             stopped = true;
+                         }
+                         else {
+                             if ((0 != qApp->get_save_cnt()) && (0 == sns_param.save_frame_cnt)) // if already capture expected frames, try to quit.
+                             {
+                                 stop(STOP_REQUEST_STOP);
+                                 //break;
+                             }
+                         }
+                     }
+                 }
+                
                 sleeping = true;
                 QThread::usleep(FRAME_PROCESS_THREAD_INTERVAL_US);
                 sleeping = false;
             }
 
-            if(ret < 0)
-            {
-                stopped = true;
-            }
-            else {
-                if ((0 != qApp->get_save_cnt()) && (0 == sns_param.save_frame_cnt)) // if already capture expected frames, try to quit.
-                {
-                    stop(STOP_REQUEST_STOP);
-                    //break;
-                }
-            }
 
             /// run_times++;
         }

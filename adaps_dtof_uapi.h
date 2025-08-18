@@ -756,6 +756,7 @@ struct adaps_dtof_module_static_data{
     __u8 chip_product_id[SWIFT_PRODUCT_ID_SIZE];
     __u8 sensor_drv_version[FW_VERSION_LENGTH];
     __u8 ready;
+    __u8 eeprom_crc_matched;
 };
 
 struct adaps_dtof_update_eeprom_data{
@@ -770,7 +771,7 @@ typedef struct {
     __u16 sensor_reg_setting_cnt;
     __u16 vcsel_reg_setting_cnt;
     __u32 roi_sram_size;
-    bool roi_sram_rotate;
+    bool roi_sram_rolling;
 } external_config_script_param_t;
 
 #define ADAPS_SET_DTOF_INITIAL_PARAM       \

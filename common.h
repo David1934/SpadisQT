@@ -13,8 +13,8 @@
 
 #define VERSION_MAJOR                           3
 #define VERSION_MINOR                           2
-#define VERSION_REVISION                        5
-#define LAST_MODIFIED_TIME                      "202500805A"
+#define VERSION_REVISION                        9
+#define LAST_MODIFIED_TIME                      "202500818A"
 
 #define DEFAULT_DTOF_FRAMERATE                  AdapsFramerateType30FPS // AdapsFramerateType60FPS
 
@@ -60,6 +60,7 @@
 
     #define SPOT_MODULE_TYPE_NAME               "Spot"
     #define FLOOD_MODULE_TYPE_NAME              "Flood"
+    #define BIG_FOV_FLOOD_MODULE_TYPE_NAME      "Big_FoV_Flood"
 #else
     #define DEFAULT_SENSOR_TYPE                 SENSOR_TYPE_RGB
 #endif
@@ -83,10 +84,16 @@
 #define ENV_VAR_DEVELOP_DEBUGGING               "develop_debugging"
 #define ENV_VAR_TEST_PATTERN_TYPE               "test_pattern_type"
 #define ENV_VAR_ROI_SRAM_COORDINATES_CHECK      "roi_sram_coordinates_check"
-#define ENV_VAR_ROI_SRAM_DATA_INJECTION         "roi_sram_data_injection"
 #define ENV_VAR_RAW_FILE_REPLAY_ENABLE          "raw_file_replay_enable"
 #define ENV_VAR_DEPTH16_FILE_REPLAY_ENABLE      "depth16_file_replay_enable"
 #define ENV_VAR_FRAME_DROP_CHECK_ENABLE         "frame_drop_check_enable"
+
+#define ENV_VAR_ROI_SRAM_DATA_INJECTION         "roi_sram_data_injection"
+#define ENV_VAR_FORCE_ROW_SEARCH_RANGE          "force_row_search_range"
+#define ENV_VAR_FORCE_COLUMN_SEARCH_RANGE       "force_column_search_range"
+#define ENV_VAR_FORCE_COARSE_EXPOSURE           "force_coarseExposure"
+#define ENV_VAR_FORCE_FINE_EXPOSURE             "force_fineExposure"
+#define ENV_VAR_FORCE_GRAY_EXPOSURE             "force_grayExposure"
 
 #define ENV_VAR_DBGINFO_ENABLE                  "debug_info_enable"
 #define ENV_VAR_TRACE_ROI_SRAM_SWITCH           "trace_roi_sram_switch"
@@ -106,8 +113,8 @@
 #define ENV_VAR_DUMP_SPOT_STATISTICS_TIMES      "dump_spot_statistics_times"
 #define ENV_VAR_DUMP_PTM_FRAME_HEADINFO_TIMES   "dump_ptm_frame_headinfo_times"
 #define ENV_VAR_DUMP_WALKERROR_PARAM_COUNT      "dump_walkerror_param_count"
-#define ENV_VAR_FORCE_ROW_SEARCH_RANGE          "force_row_search_range"
-#define ENV_VAR_FORCE_COLUMN_SEARCH_RANGE       "force_column_search_range"
+#define ENV_VAR_DUMP_OFFSETDATA_PARAM_COUNT     "dump_offsetdata_param_count"
+#define ENV_VAR_DUMP_CALIB_REFERENCE_DISTANCE   "dump_calib_reference_distance"
 
 #define __tostr(x)                          #x
 #define __stringify(x)                      __tostr(x)
@@ -218,7 +225,8 @@ typedef unsigned long long u64;
 enum moduletype{
     MODULE_TYPE_UNINITIALIZED = 0x0,
     MODULE_TYPE_SPOT = ADS6401_MODULE_SPOT,
-    MODULE_TYPE_FLOOD = ADS6401_MODULE_FLOOD
+    MODULE_TYPE_FLOOD = ADS6401_MODULE_FLOOD,
+    MODULE_TYPE_BIG_FOV_FLOOD = ADS6401_MODULE_BIG_FOV_FLOOD
 };
 
 enum stop_request_code{

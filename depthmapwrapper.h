@@ -15,7 +15,12 @@
 #define CP_DLL_PUBLIC __attribute__ ((visibility ("default")))
 #endif
 
+#if defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB) // the old algo lib 3.3.2, which supports Android.
+#define MAX_SRAM_DATA_NUMBERS      1
+#else
 #define MAX_SRAM_DATA_NUMBERS      9
+#endif
+
 #define ADAPS_SPARSE_POINT_POSITION_DATA_SIZE   960
 #define AdapsAlgoLibVersionLength               32
 #define ZONE_SIZE                               (4)
@@ -141,13 +146,19 @@ typedef struct {
         uint32_t  out_image_length;
         uint32_t* count_pt_cloud;
     };
+#if !defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
     struct SpotPoint* (*outAllPointsPtr)[ZONE_SIZE][SWIFT_SPOT_COUNTS_PER_ZONE];
+#endif
 } WrapperDepthOutput;
 
 typedef struct {
     WrapperDepthFormatParams formatParams;
     const int8_t* in_image;
+#if defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
+    int32_t in_image_fd;
+#else
     int32_t in_image_size;
+#endif
 } WrapperDepthInput;
 
 //begin: add by hzt 2021-12-6 for adaps control
@@ -159,7 +170,11 @@ typedef struct {
     AdapsMirrorFrameSet mirror_frame;
     float* adapsLensIntrinsicData;          // 9xsizeof(float)
     float* adapsSpodOffsetData;             // 4x240xsizeof(float)
+#if defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
+    float* accurateSpotPosData;             // 4x240xsizeof(float)x2 delete
+#else
     uint32_t adapsSpodOffsetDataLength;
+#endif
     uint8_t ptm_fine_exposure_value;        // fine exposure value, 0 - 255
     uint8_t exposure_period;                // exposure_period, 0 - 255
     float cali_ref_tempe[2];  //[0] for indoor, [1] for outdoor
@@ -177,10 +192,12 @@ typedef struct {
     //1byte  | 1byte  |1byte  |1byte  | 4byte  | 4byte  | 4byte  | 4byte  | 4byte  | 1byte | 1byte
     //Every spot has 26byte data (zondID to dummy2)
     uint8_t* walk_error_para_list;
+#if !defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
     uint32_t walk_error_para_list_length;
     uint8_t* calibrationInfo; // length:64 ,byte 0-8 ofilm version ,byte 9-26 adaps sdk version v4.0-180-g3b7adfgh
 #ifdef WINDOWS_BUILD
     bool dump_data;
+#endif
 #endif
 } SetWrapperParam;
 

@@ -35,11 +35,14 @@ typedef int64_t             INT64;
 #define MAX_REG_SETTING_COUNT               100
 #define MAX_SCRIPT_ITEM_COUNT               400
 
-// built-in EEPROM P24C64E-C4H-MIR, VcselDriver OPN7020
+// built-in EEPROM P24C512X-C4H-MIR, VcselDriver OPN7020
 #define ADS6401_MODULE_SPOT                 0x6401A
 
 // built-in EEPROM P24C256F-D4H-MIR, VcselDriver PhotonIC 5015, MCU HC32L110B6YA, 
 #define ADS6401_MODULE_FLOOD                0x6401B
+
+// built-in EEPROM P24C512X-C4H-MIR, VcselDriver OPN7020
+#define ADS6401_MODULE_BIG_FOV_FLOOD        0x6401C
 
 typedef struct ADAPS_MIRROR_FRAME_SET
 {
@@ -105,7 +108,7 @@ typedef enum {
 typedef enum {
     AdapsPowerModeUninitilized,
     AdapsPowerModeNormal,
-    AdapsPowerModeDiv2,
+    AdapsPowerModeDiv2,         // Div2 is not available yet now.
     AdapsPowerModeDiv3,
 } AdapsPowerMode;
 
