@@ -108,7 +108,6 @@ private:
 #if defined(RUN_ON_EMBEDDED_LINUX)
     bool            script_loaded;
     bool            roi_sram_loaded;
-    bool            roi_sram_rolling;
     char        sd_devnode_4_dtof[DEV_NODE_LEN];
     int         fd_4_dtof;
 #if !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)

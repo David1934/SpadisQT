@@ -19,21 +19,18 @@ ADAPS_DTOF::ADAPS_DTOF(struct sensor_params params)
     m_rangeHigh = COLOR_MAP_HIGH;
     m_rangeLow = RANGE_MIN;
     m_conversionLibInited = false;
-    m_decoded_frame_cnt = 0;
-    m_decoded_success_frame_cnt = 0;
+    m_input_frame_cnt = 0;
+    m_output_frame_cnt = 0;
     copied_roisram_4_anchorX = NULL_POINTER;
-#if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)
-    trace_calib_sram_switch = Utils::is_env_var_true(ENV_VAR_TRACE_ROI_SRAM_SWITCH);
-#endif
     p_misc_device = qApp->get_misc_dev_instance();
-    init_frame_checker(&checker);
+    init_frame_checker(&flc);
 }
 
 
 ADAPS_DTOF::~ADAPS_DTOF()
 {
-    DBG_NOTICE("------decode statistics------work_mode: %d, decoded_frame_cnt: %d, m_decoded_success_frame_cnt: %d---\n",
-        set_param.work_mode, m_decoded_frame_cnt, m_decoded_success_frame_cnt);
+    DBG_NOTICE("------decode statistics------work_mode: %d, m_input_frame_cnt: %d, m_output_frame_cnt: %d, flc.total_frames: %d, flc.dropped_frames: %d---\n",
+        set_param.work_mode, m_input_frame_cnt, m_output_frame_cnt, flc.total_frames, flc.dropped_frames);
     p_misc_device = NULL_POINTER;
     free(copied_roisram_4_anchorX);
     copied_roisram_4_anchorX = NULL_POINTER;
@@ -121,7 +118,7 @@ int ADAPS_DTOF::hexdump_param(void* param_ptr, int param_size, const char *param
     if (true == Utils::is_env_var_true(ENV_VAR_DUMP_ALGO_LIB_IO_PARAM))
     {
         utils = new Utils();
-        sprintf(temp_string, "-----dump %s parameter, size: %d from Line: %d-----", param_name, param_size, callline);
+        sprintf(temp_string, "-----dump %s ,parameter_size: %d from Line: %d-----", param_name, param_size, callline);
         utils->hexdump((unsigned char *) param_ptr, param_size, temp_string);
         delete utils;
     }
@@ -351,7 +348,8 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
         }
     }
 
-    p_misc_device->get_loaded_roi_sram_data_info(&loaded_roi_sram_data, &loaded_roi_sram_size);
+    loaded_roi_sram_data = qApp->get_mmap_address_4_loaded_roisram();
+    loaded_roi_sram_size = qApp->get_size_4_loaded_roisram();
 
     if (0 != loaded_roi_sram_size && NULL != loaded_roi_sram_data)
     {
@@ -377,27 +375,34 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
             }
 
             // create another buffer copy for anchorX operation to keep the original mmaped ROI sram data not be changed.
-            memcpy(copied_roisram_4_anchorX, pEEPROMData + ADS6401_EEPROM_ROISRAM_DATA_OFFSET, ADS6401_EEPROM_ROISRAM_DATA_SIZE);
+            initInputParams->rawDataSize = PER_ROISRAM_GROUP_SIZE; // ADS6401_EEPROM_ROISRAM_DATA_SIZE;
+
+            memcpy(copied_roisram_4_anchorX, pEEPROMData + ADS6401_EEPROM_ROISRAM_DATA_OFFSET, initInputParams->rawDataSize);
             setparam->spot_cali_data = copied_roisram_4_anchorX;
-            //initInputParams->pRawData = (uint8_t*) p_eeprominfo;
-            //initInputParams->rawDataSize = sizeof(swift_eeprom_data_t);
             initInputParams->pRawData = set_param.spot_cali_data;
-            initInputParams->rawDataSize = ADS6401_EEPROM_ROISRAM_DATA_SIZE;
             if (MODULE_TYPE_SPOT == qApp->get_module_type())
             {
                 roisram_anchor_preproccess(setparam->spot_cali_data, initInputParams->rawDataSize);
             }
         }
         else {
+            int force_roi_sram_size = Utils::get_env_var_intvalue(ENV_VAR_FORCE_ROI_SRAM_SIZE);
+            if (force_roi_sram_size)
+            {
+                initInputParams->rawDataSize = force_roi_sram_size;
+            }
+            else {
+                initInputParams->rawDataSize = PER_ROISRAM_GROUP_SIZE; // FLOOD_EEPROM_ROISRAM_DATA_SIZE;
+            }
+
             setparam->spot_cali_data          = pEEPROMData + FLOOD_EEPROM_ROISRAM_DATA_OFFSET;
             initInputParams->pRawData = set_param.spot_cali_data;
-            initInputParams->rawDataSize = FLOOD_EEPROM_ROISRAM_DATA_SIZE;
         }
 
         if (true == Utils::is_env_var_true(ENV_VAR_ROI_SRAM_COORDINATES_CHECK))
         {
             roiCoordinatesDumpCheck(setparam->spot_cali_data, m_sns_param.out_frm_width, m_sns_param.out_frm_height, 0);
-            if (ADS6401_EEPROM_ROISRAM_DATA_SIZE >= (2 * PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP))
+            if (initInputParams->rawDataSize >= (2 * PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP))
             {
                 roiCoordinatesDumpCheck(setparam->spot_cali_data + PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP, m_sns_param.out_frm_width, m_sns_param.out_frm_height, 1);
             }
@@ -721,14 +726,12 @@ int ADAPS_DTOF::initParams(WrapperDepthInitInputParams* initInputParams, Wrapper
     initOutputParams->exposure_time = &m_exposure_time;
     initOutputParams->sensitivity = &m_sensitivity;
 
-    DBG_INFO("initParams set_param.compose_subframe=%d set_param.expand_pixel=%d set_param.mirror_frame.mirror_x=%d  set_param.mirror_frame.mirror_y=%d\n",
-           set_param.compose_subframe,set_param.expand_pixel,set_param.mirror_frame.mirror_x,set_param.mirror_frame.mirror_y);
 #if defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
-    DBG_NOTICE("initParams success, algo lib version: %s, roi_sram_size: %d, roi_sram_rolling: %d, walkerror: %d, loaded_roi_sram_size: %d, work_mode=%d env_type=%d  measure_type=%d", 
-        m_DepthLibversion, initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), set_param.walkerror, loaded_roi_sram_size, set_param.work_mode,set_param.env_type,set_param.measure_type);
+    DBG_NOTICE("initParams success, roi_sram_size: %d, roi_sram_rolling: %d, walkerror: %d, loaded_roi_sram_size: %d, work_mode=%d env_type=%d  measure_type=%d", 
+         initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), set_param.walkerror, loaded_roi_sram_size, set_param.work_mode,set_param.env_type,set_param.measure_type);
 #else
-    DBG_NOTICE("initParams success, algo lib version: %s, roi_sram_size: %d, roi_sram_rolling: %d, walkerror: %d, loaded_roi_sram_size: %d, adapsSpodOffsetDataLength: %d, walk_error_para_list_length: %d, work_mode=%d env_type=%d  measure_type=%d", 
-        m_DepthLibversion, initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), set_param.walkerror, loaded_roi_sram_size, set_param.adapsSpodOffsetDataLength, set_param.walk_error_para_list_length, set_param.work_mode,set_param.env_type,set_param.measure_type);
+    DBG_NOTICE("initParams success, roi_sram_size: %d, roi_sram_rolling: %d, walkerror: %d, loaded_roi_sram_size: %d, adapsSpodOffsetDataLength: %d, walk_error_para_list_length: %d, work_mode=%d env_type=%d  measure_type=%d", 
+        initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), set_param.walkerror, loaded_roi_sram_size, set_param.adapsSpodOffsetDataLength, set_param.walk_error_para_list_length, set_param.work_mode,set_param.env_type,set_param.measure_type);
 #endif
 
     return 0;
@@ -747,6 +750,7 @@ int ADAPS_DTOF::adaps_dtof_initilize()
     }
 
     hexdump_param(&initInputParams, sizeof(WrapperDepthInitInputParams), "initInputParams", __LINE__);
+    hexdump_param(&initOutputParams, sizeof(WrapperDepthInitOutputParams), "initOutputParams", __LINE__);
     result = DepthMapWrapperCreate(&m_handlerDepthLib, initInputParams, initOutputParams);
     if (!m_handlerDepthLib || result < 0) {
         DBG_ERROR("Error creating depth map wrapper, result: %d, m_handlerDepthLib: %p", result, m_handlerDepthLib);
@@ -762,7 +766,9 @@ int ADAPS_DTOF::adaps_dtof_initilize()
     DepthMapWrapperSetCircleMask(m_handlerDepthLib,circleForMask);
 #endif
 
-    DBG_NOTICE("Adaps depth lib initialize okay, m_handlerDepthLib: %p.", m_handlerDepthLib);
+    DBG_NOTICE("Adaps depth lib initialize okay, expected lib version(api interface): v%d.%d.%d, current running lib(.so): v%s, m_handlerDepthLib: %p.",
+        ALGO_LIB_VERSION_MAJOR, ALGO_LIB_VERSION_MINOR, ALGO_LIB_VERSION_REVISION, m_DepthLibversion,
+        m_handlerDepthLib);
 
     m_conversionLibInited = true;
 
@@ -835,65 +841,6 @@ void ADAPS_DTOF::Distance_2_BGRColor(int bucketNum, float bucketSize, u16 distan
     destColor->Red = (u8)(m_basic_colors[bucketNum].Red + (m_basic_colors[bucketNum+1].Red - m_basic_colors[bucketNum].Red) * scale);
 }
 
-#if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)
-int ADAPS_DTOF::DepthBufferMerge(u16 merged_depth16_buffer[], const u16 to_merge_depth16_buffer[], int outImgWidth, int outImgHeight)
-{
-    int index;
-    int  i, j;
-    u8 to_merge_confidence;
-    u16 merged_depth16, to_merge_depth16;
-    u16 to_merge_distance;
-    int new_added_spot_count = 0;
-
-    if (NULL_POINTER == merged_depth16_buffer) {
-        DBG_ERROR( "merged_depth16_buffer is NULL");
-        return -1;
-    }
-
-    if (NULL_POINTER == to_merge_depth16_buffer) {
-        DBG_ERROR( "to_merge_depth16_buffer is NULL");
-        return -1;
-    }
-
-    for (j = 0; j < outImgHeight; j++)
-    {
-        for (i = 0; i < outImgWidth; i++)
-        {
-            index = j * outImgWidth + i;
-            to_merge_depth16 = to_merge_depth16_buffer[index];
-            to_merge_distance = to_merge_depth16 & DEPTH_MASK;
-
-            if (0 != to_merge_distance)
-            {
-                merged_depth16 = merged_depth16_buffer[index];
-                to_merge_confidence = (to_merge_depth16 >> DEPTH_BITS) & CONFIDENCE_MASK;
-
-                if ((ANDROID_CONF_LOW != to_merge_confidence) && (0 == merged_depth16))
-                {
-                    merged_depth16_buffer[index] = to_merge_depth16;
-                    new_added_spot_count++;
-                }
-                else {
-                    if (0 != merged_depth16)
-                    {
-                       // DBG_INFO("--- frm_cnt: %d, Spot(%d, %d) exists in merged frame already, merged_depth: 0x%04x, to_merge_depth: 0x%04x...", m_decoded_frame_cnt, i, j, merged_depth16, to_merge_depth16);
-                    }
-                    else {
-                       // DBG_NOTICE("--- frm_cnt: %d, Spot(%d, %d) has too low confidence, to_merge_depth: 0x%04x...", m_decoded_frame_cnt, i, j, to_merge_depth16);
-                    }
-                }
-            }
-        }
-    }
-
-    if (trace_calib_sram_switch)
-    {
-        DBG_NOTICE("### frame_%d new_added_spot_count: %d", m_decoded_frame_cnt, new_added_spot_count);
-    }
-    return new_added_spot_count;
-}
-#endif
-
 int ADAPS_DTOF::dumpSpotCount(const u16 depth16_buffer[], const int outImgWidth, const int outImgHeight, const uint32_t frm_sequence, const uint32_t out_frame_cnt, int decodeRet, int callline)
 {
     int index;
@@ -944,8 +891,11 @@ int ADAPS_DTOF::dumpSpotCount(const u16 depth16_buffer[], const int outImgWidth,
         }
     }
 
-    DBG_NOTICE("### output_frame[%d] has (%d,%d,%d,%d) spots from high to low confidence, frm_sequence: %d, decodeRet: %d, call from line: %d.", 
-        out_frame_cnt, spot_cnt_4_high_confidence, spot_cnt_4_mid_confidence, spot_cnt_4_other_confidence, spot_cnt_4_low_confidence, frm_sequence, decodeRet, callline);
+    DBG_NOTICE("### output_frame[%d] has (%d + %d + %d + %d) = %d spots from high to low confidence, frm_sequence: %d, decodeRet: %d, call from line: %d.", 
+        out_frame_cnt,
+        spot_cnt_4_high_confidence, spot_cnt_4_mid_confidence, spot_cnt_4_other_confidence, spot_cnt_4_low_confidence,
+        spot_cnt_4_high_confidence + spot_cnt_4_mid_confidence + spot_cnt_4_other_confidence + spot_cnt_4_low_confidence,
+        frm_sequence, decodeRet, callline);
 
     return spot_cnt_4_high_confidence;
 }
@@ -1121,7 +1071,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
                 if (Utils::is_env_var_true(ENV_VAR_DUMP_SPOT_DEPTH))
                 {
                     DBG_NOTICE("### frm_cnt: %d,Spot(%d, %d) distance: %d mm, confidence: %d, non_zero_depth_count: %d, bgrColor(%d, %d, %d)",
-                        m_decoded_frame_cnt, i, j, distance, confidence, non_zero_depth_count, bgrColor.Blue, bgrColor.Green, bgrColor.Red);
+                        m_input_frame_cnt, i, j, distance, confidence, non_zero_depth_count, bgrColor.Blue, bgrColor.Green, bgrColor.Red);
                 }
             }
             else { // Show as colors[4]
@@ -1131,7 +1081,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
 
                 if (Utils::is_env_var_true(ENV_VAR_DUMP_SPOT_DEPTH))
                 {
-                    DBG_NOTICE("--- frm_cnt: %d, Spot(%d, %d) distance: %d mm, confidence: %d, non_zero_depth_count: %d", m_decoded_frame_cnt, i, j, distance, confidence, non_zero_depth_count);
+                    DBG_NOTICE("--- frm_cnt: %d, Spot(%d, %d) distance: %d mm, confidence: %d, non_zero_depth_count: %d", m_input_frame_cnt, i, j, distance, confidence, non_zero_depth_count);
                 }
             }
 #endif
@@ -1160,7 +1110,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
                     if (Utils::is_env_var_true(ENV_VAR_DUMP_MID_CONF_ENABLE))
                     {
                         DBG_NOTICE("frm_cnt: %d, non_zero_depth_count: %d, Spot(%d, %d) depth16: 0x%x, distance: %d mm, confidence: %d", 
-                            m_decoded_frame_cnt, non_zero_depth_count, i, j, depth16_buffer[rawImgIdx], distance, confidence);
+                            m_input_frame_cnt, non_zero_depth_count, i, j, depth16_buffer[rawImgIdx], distance, confidence);
                     }
                     depth_confidence_map[rawImgIdx * 3 + 0] = 0xFF; //Red;
                     depth_confidence_map[rawImgIdx * 3 + 1] = 0xFF; //Green;
@@ -1176,17 +1126,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
         }
     }
 
-#if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)
-    if (trace_calib_sram_switch)
-    {
-        DBG_NOTICE("### frame_%d non_zero_depth_count: %d, set_param.expand_pixel: %d", m_decoded_frame_cnt, non_zero_depth_count, set_param.expand_pixel);
-    }
-    else {
-        DBG_INFO("### frame_%d non_zero_depth_count: %d, set_param.expand_pixel: %d", m_decoded_frame_cnt, non_zero_depth_count, set_param.expand_pixel);
-    }
-#else
-    DBG_INFO("### frame_%d non_zero_depth_count: %d, set_param.expand_pixel: %d", m_decoded_frame_cnt, non_zero_depth_count, set_param.expand_pixel);
-#endif
+    DBG_INFO("### frame_%d non_zero_depth_count: %d, set_param.expand_pixel: %d", m_input_frame_cnt, non_zero_depth_count, set_param.expand_pixel);
 }
 
 void ADAPS_DTOF::ConvertGreyscaleToColoredMap(u16 depth16_buffer[], u8 greyscale_colored_map[], int outImgWidth, int outImgHeight)
@@ -1245,12 +1185,40 @@ void ADAPS_DTOF::ConvertGreyscaleToColoredMap(u16 depth16_buffer[], u8 greyscale
 #endif
 }
 
-int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, u16 depth16_buffer[], enum sensor_workmode swk)
+SpotPoint* ADAPS_DTOF::get_spcific_histogram(uint16_t x, uint16_t y)
+{
+    SpotPoint* spotPoint = NULL_POINTER;
+    bool found = false;
+
+    for (int group = 0; group < MAX_SRAM_DATA_NUMBERS ; group++) {
+        for (int zone = 0; zone < ZONE_SIZE ; zone++) {
+            for (int i = 0; i < SWIFT_SPOT_COUNTS_PER_ZONE; i++) {
+                //SpotPoint* spotPoint = *(depthOutputs[0].outAllPointsPtr[0][group][zone] + i);
+                SpotPoint* spotPoint = (*depthOutputs[0].outAllPointsPtr)[group][zone][i];
+                if ((spotPoint->x == x) && (spotPoint->y == y)) {
+                    found = true;
+                }
+            }
+        }
+    }
+
+    if (false == found)
+    {
+        return NULL_POINTER;
+    }
+    else {
+        return spotPoint;
+    }
+}
+
+int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, u16 depth16_buffer[], pc_pkt_t *point_cloud_buffer, enum sensor_workmode swk)
 {
     int result=0;
     bool done = false;
     uint32_t req_output_stream_cnt = 0;
-    // Host_Communication *host_comm = Host_Communication::getInstance();
+    struct timeval tv;
+    unsigned long FrameDecStartTimeUsec;
+    unsigned long timeUs;
 
     Q_UNUSED(swk);
 
@@ -1266,15 +1234,14 @@ int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_
         return -1;
     }
 
-    {
-        depthOutputs[0].format                    = WRAPPER_CAM_FORMAT_DEPTH16;
-        depthOutputs[0].formatParams.bitsPerPixel = 16;
-        depthOutputs[0].formatParams.strideBytes  = m_sns_param.out_frm_width;
-        depthOutputs[0].formatParams.sliceHeight  = m_sns_param.out_frm_height;
-        depthOutputs[0].out_image_length          = m_sns_param.out_frm_width*m_sns_param.out_frm_height*sizeof(u16);
-        depthOutputs[0].out_depth_image = (uint8_t*) depth16_buffer;
-        req_output_stream_cnt = 1;
-    }
+    depthOutputs[0].format                    = WRAPPER_CAM_FORMAT_DEPTH16;
+    depthOutputs[0].formatParams.bitsPerPixel = 16;
+    depthOutputs[0].formatParams.strideBytes  = m_sns_param.out_frm_width;
+    depthOutputs[0].formatParams.sliceHeight  = m_sns_param.out_frm_height;
+    depthOutputs[0].out_image_length          = m_sns_param.out_frm_width*m_sns_param.out_frm_height*sizeof(u16);
+    depthOutputs[0].out_depth_image = (uint8_t*) depth16_buffer;
+    depthOutputs[0].out_pcloud_image = point_cloud_buffer;
+    req_output_stream_cnt = 1;
 
     depthInput.in_image    = (const int8_t*)frm_rawdata;
     depthInput.formatParams.bitsPerPixel = 8;
@@ -1282,64 +1249,59 @@ int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_
     depthInput.formatParams.sliceHeight  = m_sns_param.raw_height;
 #if !defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
     depthInput.in_image_size    = frm_rawdata_size;
+    depthInput.in_sram_id    = NULL;    // just to set to NULL for normal algo lib call
 #endif
     //DBG_INFO( "raw_width: %d raw_height: %d out_width: %d out_height: %d\n", m_sns_param.raw_width, m_sns_param.raw_height, m_sns_param.out_frm_width, m_sns_param.out_frm_height);
 
     if ((WK_DTOF_PCM != swk) && (true == Utils::is_env_var_true(ENV_VAR_FRAME_DROP_CHECK_ENABLE)))
     {
-        int lost = check_frame_loss(&checker, frm_rawdata, frm_rawdata_size);
+        int lost = check_frame_loss(&flc, frm_rawdata, frm_rawdata_size);
         if (lost > 0) {
-            DBG_ERROR("Dropped %d frames, last_id: %d, frm_sequence: %d\n", lost, checker.last_id, frm_sequence);
+            DBG_ERROR("Dropped %d frames, last_id: %d, frm_sequence: %d\n", lost, flc.last_id, frm_sequence);
         }
     }
 
     PrepareFrameParam(&depthConfig);
 
-    //BOOL disableAlgo = CamX::OsUtils::GetPropertyBool("debug.adaps.disableAlgo", false);
-    bool disableAlgo =false;
-
-    if (false == disableAlgo)
+    if (0 == m_input_frame_cnt)
     {
-        if (0 == m_decoded_frame_cnt)
-        {
-            hexdump_param(&depthInput, sizeof(WrapperDepthInput), "depthInput", __LINE__);
-            hexdump_param(&depthConfig, sizeof(WrapperDepthCamConfig), "depthConfig", __LINE__);
-            hexdump_param(&depthOutputs, sizeof(WrapperDepthOutput), "output0", __LINE__);
-        }
-
-        done = DepthMapWrapperProcessFrame(m_handlerDepthLib,
-                                    depthInput,
-                                    &depthConfig,
-                                    req_output_stream_cnt,
-                                    depthOutputs);
-        m_decoded_frame_cnt++;
-
+        DBG_INFO("sizeof(WrapperDepthOutput): %ld, sizeof(struct SpotPoint): %ld\n", sizeof(WrapperDepthOutput), sizeof(struct SpotPoint));
+        hexdump_param(&depthInput, sizeof(WrapperDepthInput), "depthInput", __LINE__);
+        hexdump_param(&depthConfig, sizeof(WrapperDepthCamConfig), "depthConfig", __LINE__);
+        hexdump_param(&depthOutputs, sizeof(WrapperDepthOutput), "depthOutputs", __LINE__);
     }
-    else {
-        static  uint32_t count_g=0;
-        count_g++;
-        if(count_g%4 == 0)
-            done = 1;
-        else
-            done = 0;
 
-       DBG_INFO( " bypass the algo done=%d \n",done);
+    gettimeofday(&tv,NULL_POINTER);
+    FrameDecStartTimeUsec = tv.tv_sec*1000000 + tv.tv_usec;
+    done = DepthMapWrapperProcessFrame(m_handlerDepthLib,
+                                depthInput,
+                                &depthConfig,
+                                req_output_stream_cnt,
+                                depthOutputs);
+    m_input_frame_cnt++;
+
+    if (true == Utils::is_env_var_true(ENV_VAR_TRACE_ALGO_LIB_DECODE_COSTTIME))
+    {
+        gettimeofday(&tv,NULL_POINTER);
+        timeUs = tv.tv_sec*1000000 + tv.tv_usec;
+        timeUs = (timeUs - FrameDecStartTimeUsec);
+        if (WK_DTOF_PCM == swk)
+        {
+            DBG_NOTICE("FrameDecode() return %d for mipi frame: %d, cost time: %lu us, input_frm_cnt: %d, output_frm_cnt: %d\n",
+                done, frm_sequence, timeUs, m_input_frame_cnt, m_output_frame_cnt);
+        }
+        else {
+            DBG_NOTICE("FrameDecode() return %d for mipi frame: %d [sram_id: %d, zone_id: %d, frame_id: %d], cost time: %lu us, work_mode: %d, input_frm_cnt: %d, output_frm_cnt: %d\n",
+                done, frm_sequence, frm_rawdata[0], frm_rawdata[1], frm_rawdata[2], timeUs, swk, m_input_frame_cnt, m_output_frame_cnt);
+        }
     }
 
     if (true == done)
     {
-        m_decoded_success_frame_cnt++;
-        if (true == Utils::is_env_var_true(ENV_VAR_DEBUG_ALGO_LIB_RET_VALUE))
-        {
-            DBG_NOTICE("DepthMapWrapperProcessFrame() return TRUE for mipi frame: %d\n", frm_sequence);
-        }
+        m_output_frame_cnt++;
         result = 0;
     }
     else {
-        if (true == Utils::is_env_var_true(ENV_VAR_DEBUG_ALGO_LIB_RET_VALUE))
-        {
-            DBG_NOTICE("DepthMapWrapperProcessFrame() return false for mipi frame: %d, swk: %d\n", frm_sequence, swk);
-        }
         result = -1;
     }
 

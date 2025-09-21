@@ -45,7 +45,7 @@ const int COLOR_MAP_HIGH = COLOR_MEDIUM;
 const int RANGE_MIN = 30;
 const int RANGE_MAX = 8192;
 
-#define MAX_DEPTH_OUTPUT_FORMATS 3
+#define MAX_DEPTH_OUTPUT_FORMATS 1
 #define CHIP_TEMPERATURE_MIN_THRESHOLD             15.0
 #define CHIP_TEMPERATURE_MAX_THRESHOLD             90.0
 
@@ -66,21 +66,6 @@ struct BGRColor
     u8 Red;
 };
 
-#if 0
-typedef void* CHILIBRARYHANDLE;
-typedef DepthMapWrapper*(*CREATEDEPTHMAPWRAPPER)(
-      WrapperDepthInitInputParams  initInputParams,
-      WrapperDepthInitOutputParams initOutputParams);
-typedef void(*DESTROYDEPTHMAPWRAPPER)(
-      DepthMapWrapper* pDepthMapWrapper);
-typedef bool(*PROCESSFRAME)(
-      DepthMapWrapper*       pDepthMapWrapper,
-      WrapperDepthInput      in_image,
-      WrapperDepthCamConfig* wrapper_depth_map_config,
-      uint32_t                 num_outputs,
-      WrapperDepthOutput     outputs[]);
-#endif
-
 // Frame loss checking state structure
 typedef struct {
     unsigned char last_id;      // ID of the last frame
@@ -100,14 +85,12 @@ public:
     void GetDepth4watchSpot(const u16 depth16_buffer[], const int outImgWidth, u8 x, u8 y, u16 *distance, u8 *confidence);
     void ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_colored_map[], u8 depth_confidence_map[], const int outImgWidth, const int outImgHeight);
     void ConvertGreyscaleToColoredMap(u16 depth16_buffer[], u8 depth_colored_map[], int outImgWidth, int outImgHeight);
-    int dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_rawdata, int buf_len, u16 depth16_buffer[], enum sensor_workmode swk);
+    int dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, u16 depth16_buffer[], pc_pkt_t *point_cloud_buffer, enum sensor_workmode swk);
     void adaps_dtof_release();
-#if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)
-    int DepthBufferMerge(u16 merged_depth16_buffer[], const u16 to_merge_depth16_buffer[], int outImgWidth, int outImgHeight);
-#endif
     int dumpSpotCount(const u16 depth16_buffer[], const int outImgWidth, const int outImgHeight, const uint32_t frm_sequence, const uint32_t out_frame_cnt, int decodeRet, int callline);
     int depthMapDump(const u16 depth16_buffer[], const int outImgWidth, const int outImgHeight, const uint32_t out_frame_cnt, int callline);
     int dump_frame_headinfo(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, enum sensor_workmode swk);
+    SpotPoint* get_spcific_histogram(uint16_t x, uint16_t y);
 
 private:
     Misc_Device *p_misc_device;
@@ -126,19 +109,16 @@ private:
     char m_DepthLibversion[32];
     char m_DepthLibConfigXmlPath[128];
     bool m_conversionLibInited;
-    uint32_t m_decoded_frame_cnt;
-    uint32_t m_decoded_success_frame_cnt;
+    uint32_t m_input_frame_cnt;
+    uint32_t m_output_frame_cnt;
     WrapperDepthOutput depthOutputs[MAX_DEPTH_OUTPUT_FORMATS];
     WrapperDepthInput depthInput;
     WrapperDepthCamConfig depthConfig;
-    FrameLossChecker checker;
+    FrameLossChecker flc;
     void* loaded_roi_sram_data;
     uint8_t* copied_roisram_4_anchorX;
     uint32_t loaded_roi_sram_size;
 
-#if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)
-    bool trace_calib_sram_switch;
-#endif
     u8 frameCoordinatesMap[OUTPUT_HEIGHT_4_DTOF_SENSOR][OUTPUT_WIDTH_4_DTOF_SENSOR];
 
     void roisram_anchor_preproccess(uint8_t *roisram_buf, uint32_t roisram_buf_size);

@@ -20,10 +20,6 @@
 #define SOC_PLATFORM_TI                 0x1000
 #define SOC_PLATFORM_TI_AM62A           (SOC_PLATFORM_TI + 1)
 
-
-
-
-
 #if !defined(BIT)
 #define BIT(n)                  (1 << n)
 #endif
@@ -235,6 +231,14 @@ struct hawk_norflash_op_param
     __u32 len;
 }__attribute__ ((packed));
 
+struct hawk_sensor_cfg_data
+{
+    __u8 hVldSeg;
+    __u8 vRollNum;
+    __u8 hRollNum;
+    __u8 scanMode;
+}__attribute__ ((packed));
+
 #define ADTOF_ENABLE_STREAM_NUM      \
     _IOW('T', ADAPS_DTOF_PRIVATE + 2, __u32 *)
 
@@ -365,10 +369,9 @@ struct hawk_norflash_op_param
 #define ADTOF_GET_HAWK_OTP_RAW_DATA       \
     _IOR('T', ADAPS_DTOF_PRIVATE + 44, struct hawk_otp_raw_data *)          // 0x2C
 
+#define ADTOF_SET_SENSOR_CFG_DATA       \
+    _IOW('T', ADAPS_DTOF_PRIVATE + 45, struct hawk_sensor_cfg_data *)          // 0x2D
 #endif // FOR ADAPS_HAWK
-
-
-
 
 
 
@@ -376,12 +379,6 @@ struct hawk_norflash_op_param
 #if defined(CONFIG_VIDEO_ADS6401) || defined(CONFIG_VIDEO_PACIFIC) // FOR ADAPS_SWIFT
 
 #include "adaps_types.h"
-
-#if defined(CONFIG_ADAPS_SWIFT_FLOOD)
-    #define SWIFT_MODULE_TYPE               ADS6401_MODULE_FLOOD
-#else
-    #define SWIFT_MODULE_TYPE               ADS6401_MODULE_SPOT
-#endif
 
 #define MAX_CALIB_SRAM_ROTATION_GROUP_CNT   9
 
@@ -719,9 +716,12 @@ struct adaps_dtof_intial_param {
     UINT8 rowSearchingRange;
     UINT8 colSearchingRange;
 
+    // The following config are for Advanced user only, just set them to 0 (the default setting will be used in ads6401.c driver code) if you are not clear what they are.
     UINT8 grayExposure;
     UINT8 coarseExposure;
     UINT8 fineExposure;
+    UINT8 laserExposurePeriod;  // laser_exposure_period, register configure value
+    bool roi_sram_rolling;
 };
 
 struct adaps_dtof_runtime_param{
@@ -748,7 +748,7 @@ struct adaps_dtof_runtime_status_param {
 };
 
 struct adaps_dtof_module_static_data{
-    __u32 module_type;            // refer to ADS6401_MODULE_SPOT and ADS6401_MODULE_FLOOD of adaps_types.h file
+    __u32 module_type;            // refer to ADS6401_MODULE_SPOT/ADS6401_MODULE_FLOOD/... of adaps_types.h file
     __u32 eeprom_capacity;       // unit is byte
     __u16 otp_vbe25;
     __u16 otp_vbd;        // unit is 10mv, or the related V X 100
@@ -760,7 +760,7 @@ struct adaps_dtof_module_static_data{
 };
 
 struct adaps_dtof_update_eeprom_data{
-    __u32 module_type;            // refer to ADS6401_MODULE_SPOT and ADS6401_MODULE_FLOOD of adaps_types.h file
+    __u32 module_type;            // refer to ADS6401_MODULE_SPOT/ADS6401_MODULE_FLOOD/... of adaps_types.h file
     __u32 eeprom_capacity;       // unit is byte
     __u32 offset;             //eeprom data start offset
     __u32 length;                //eeprom data length
@@ -770,13 +770,16 @@ typedef struct {
     __u8 work_mode;
     __u16 sensor_reg_setting_cnt;
     __u16 vcsel_reg_setting_cnt;
-    __u32 roi_sram_size;
-    bool roi_sram_rolling;
 } external_config_script_param_t;
+
+typedef struct {
+    __u32 roi_sram_size;
+} external_roisram_data_size_t;
 
 #define ADAPS_SET_DTOF_INITIAL_PARAM       \
     _IOW('T', ADAPS_DTOF_PRIVATE + 0, struct adaps_dtof_intial_param)
 
+// This command has been deprecated; do not use it anymore. 
 #define ADAPS_UPDATE_DTOF_RUNTIME_PARAM       \
     _IOW('T', ADAPS_DTOF_PRIVATE + 1, struct adaps_dtof_runtime_param)
 
@@ -798,8 +801,12 @@ typedef struct {
 #define ADTOF_SET_EXTERNAL_CONFIG_SCRIPT      \
     _IOW('T', ADAPS_DTOF_PRIVATE + 7, external_config_script_param_t *)
 
+// This command carries the risk of damaging the module calibration data and is restricted to internal use at adaps company only.
 #define ADTOF_UPDATE_EEPROM_DATA       \
     _IOW('T', ADAPS_DTOF_PRIVATE + 8, struct adaps_dtof_update_eeprom_data)
+
+#define ADTOF_SET_EXTERNAL_ROISRAM_DATA_SIZE      \
+    _IOW('T', ADAPS_DTOF_PRIVATE + 9, external_roisram_data_size_t *)
 
 
 #endif // FOR ADAPS_SWIFT

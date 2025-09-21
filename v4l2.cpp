@@ -460,37 +460,6 @@ int V4L2::V4l2_initilize(void)
         DBG_INFO("Buffer type:\tV4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE");
     }
 
-#if 0
-    fmtdesc.index       = 0;
-    fmtdesc.type        = buf_type;
-    DBG_INFO("Support formats:");
-    while (ioctl(fd, VIDIOC_ENUM_FMT, &fmtdesc) != -1) {
-        DBG_INFO("\t%d\t%s\t\tfourcc:0x%x(%c%c%c%c)",
-            fmtdesc.index + 1, 
-            fmtdesc.description, 
-            fmtdesc.pixelformat,
-            fmtdesc.pixelformat & 0xff,
-            fmtdesc.pixelformat >> 8 & 0xff,
-            fmtdesc.pixelformat >> 16 & 0xff,
-            fmtdesc.pixelformat >> 24 & 0xff
-            );
-        frmsize.pixel_format = fmtdesc.pixelformat;
-        frmsize.index       = 0;
-        
-        while (ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) >= 0) {
-            if (frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
-                DBG_INFO("\t\tDISCRETE resolution[%d]: %d X %d",frmsize.index, frmsize.discrete.width, frmsize.discrete.height);
-            }
-            else if (frmsize.type == V4L2_FRMSIZE_TYPE_STEPWISE) {
-                DBG_INFO("\t\tSTEPWISE resolution[%d]: %d X %d",frmsize.index, frmsize.stepwise.max_width, frmsize.stepwise.max_height);
-            }
-        
-            frmsize.index++;
-        }
-        fmtdesc.index++;
-    }
-#endif
-
     // when config swift work mode, need TDC delay min/max need to know which environment, which measurement is used, so I move this the following lines before set sensor fmt;
 #if defined(RUN_ON_EMBEDDED_LINUX)
     if (SENSOR_TYPE_DTOF == snr_param.sensor_type)
@@ -504,7 +473,6 @@ int V4L2::V4l2_initilize(void)
         }
 
         script_loaded = false;
-        qApp->set_roi_sram_rolling(false);
 
 #if !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
         if (host_comm)
@@ -513,31 +481,38 @@ int V4L2::V4l2_initilize(void)
             u8 *backuped_script_buffer;     // script buffer backup from CMD_HOST_SIDE_START_CAPTURE
             UINT8 backuped_wkmode;
             UINT32 backuped_roisram_data_sz;
-            UINT8 *backuped_roisram_data;
 
-            host_comm->get_backuped_external_config_info(&backuped_wkmode, &backuped_script_buffer, &backuped_script_buf_sz, &backuped_roisram_data, &backuped_roisram_data_sz, &roi_sram_rolling);
-            DBG_INFO("backuped_wkmode: %d, backuped_script_buf_sz: %d, backuped_roisram_data_sz: %d, roi_sram_rolling: %d...\n", backuped_wkmode, backuped_script_buf_sz, backuped_roisram_data_sz, roi_sram_rolling);
+            host_comm->get_backuped_external_config_script(&backuped_wkmode, &backuped_script_buffer, &backuped_script_buf_sz);
+            backuped_roisram_data_sz = qApp->get_size_4_loaded_roisram();
+            DBG_INFO("backuped_wkmode: %d, backuped_script_buf_sz: %d, backuped_roisram_data_sz: %d...\n", backuped_wkmode, backuped_script_buf_sz, backuped_roisram_data_sz);
 
             roi_sram_loaded = (backuped_roisram_data_sz > 0) ? true: false;
-            if (backuped_roisram_data_sz <= ALL_ROISRAM_GROUP_SIZE)
+            if (backuped_roisram_data_sz <= PER_ROISRAM_GROUP_SIZE)
             {
-                roi_sram_rolling = false;
+                qApp->set_roi_sram_rolling(false);
             }
-            qApp->set_roi_sram_rolling(roi_sram_rolling);
 
-            if (backuped_script_buf_sz || backuped_roisram_data_sz)
+            if (backuped_script_buf_sz)
             {
-                int ret = p_misc_device->send_down_external_config(backuped_wkmode, backuped_script_buf_sz, (const uint8_t* ) backuped_script_buffer, backuped_roisram_data_sz, (const uint8_t* ) backuped_roisram_data, roi_sram_rolling);
+                int ret = p_misc_device->send_down_external_config(backuped_wkmode, backuped_script_buf_sz, (const uint8_t* ) backuped_script_buffer);
                 if (0 > ret)
                 {
                     char err_msg[] = "work_mode and the register config in script buffer is mismatched";
                     host_comm->report_status(CMD_HOST_SIDE_START_CAPTURE, CMD_DEVICE_SIDE_ERROR_MISMATCHED_WORK_MODE, err_msg, strlen(err_msg));
+                    DBG_ERROR("work_mode and the register config in script buffer is mismatched");
                     return 0 - __LINE__;
                 }
 
-                if (backuped_script_buf_sz)
+                script_loaded = true;
+            }
+
+            if (backuped_roisram_data_sz)
+            {
+                int ret = p_misc_device->send_down_loaded_roisram_data_size(backuped_roisram_data_sz);
+                if (0 > ret)
                 {
-                    script_loaded = true;
+                    DBG_ERROR("Fail to send_down_loaded_roisram_data_size");
+                    return 0 - __LINE__;
                 }
             }
         }
@@ -550,7 +525,8 @@ int V4L2::V4l2_initilize(void)
         param.power_mode = snr_param.power_mode;
         qApp->get_anchorOffset(&param.rowOffset, &param.colOffset);
         qApp->get_spotSearchingRange(&param.rowSearchingRange, &param.colSearchingRange);
-        qApp->get_usrCfgExposureValues(&param.coarseExposure, &param.fineExposure, &param.grayExposure);
+        qApp->get_usrCfgExposureValues(&param.coarseExposure, &param.fineExposure, &param.grayExposure, &param.laserExposurePeriod);
+        param.roi_sram_rolling = qApp->is_roi_sram_rolling();
 
         if (0 > p_misc_device->write_dtof_initial_param(&param))
         {
@@ -601,26 +577,6 @@ int V4L2::V4l2_initilize(void)
         DBG_INFO("pix.height:\t%d", fmt.fmt.pix.height);
         DBG_INFO("pix.field:\t%d", fmt.fmt.pix.field);
     }
-
-#if 0
-    setfps.type         = buf_type; // 设置摄像头的帧率，这里一般设置为 30fps
-    setfps.parm.capture.timeperframe.denominator = 30; //fps=30/1=30
-    setfps.parm.capture.timeperframe.numerator = 1;
-
-    if (ioctl(fd, VIDIOC_S_PARM, &setfps) == -1) {
-        qDebug("Unable to set fps on <%s> line:%d, errno: %s (%d)...", __FUNCTION__, __LINE__, strerror(errno), errno);
-        return 0 - errno;
-    }
-
-    if (ioctl(fd, VIDIOC_G_PARM, &setfps) == -1) //重新读取结构体，以确认完成设置
-    {
-        qDebug() << "Unable to get fps";
-        return 0 - errno;
-    }
-    else {
-        qDebug() << "fps:\t" << setfps.parm.capture.timeperframe.denominator / setfps.parm.capture.timeperframe.numerator;
-    }
-#endif
 
     if (false == alloc_buffers())
     {
@@ -830,20 +786,24 @@ int V4L2::Capture_frame()
 #endif
 #endif
 
-    if (true != Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_PROCESS))
+    if ((true == Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_PROCESS))            // if skip frame proceess with the environment variable
+#if defined(CONSOLE_APP_WITHOUT_GUI)
+        || (host_comm && FRAME_RAW_DATA == host_comm->get_req_out_data_type())  // or if host side only request raw data, skip frame decode process
+#endif
+        )
     {
+        if (1 == v4l2_buf.sequence % FRAME_INTERVAL_4_PROGRESS_REPORT)
+        {
+            DBG_NOTICE("%s() mipi_rx_fps = %d fps, rxFrameCnt: %ld\n",  __FUNCTION__, mipi_rx_fps, rxFrameCnt);
+        }
+    }
+    else {
         emit update_info(param1);
 #if defined(RUN_ON_EMBEDDED_LINUX) && !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
         emit rx_new_frame(v4l2_buf.sequence, buffers[v4l2_buf.index].start, bytesused, v4l2_buf.timestamp, frm_type, total_bytes_per_line, param);
 #else
         emit rx_new_frame(v4l2_buf.sequence, buffers[v4l2_buf.index].start, bytesused, v4l2_buf.timestamp, frm_type, total_bytes_per_line);
 #endif
-    }
-    else {
-        if (1 == v4l2_buf.sequence % FRAME_INTERVAL_4_PROGRESS_REPORT)
-        {
-            DBG_NOTICE("%s() mipi_rx_fps = %d fps, rxFrameCnt: %ld\n",  __FUNCTION__, mipi_rx_fps, rxFrameCnt);
-        }
     }
 
 error_exit:

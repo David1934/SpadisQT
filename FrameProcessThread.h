@@ -43,18 +43,17 @@ private:
 
     #if defined(RUN_ON_EMBEDDED_LINUX)
         ADAPS_DTOF *adaps_dtof;
-        //Host_Communication *host_comm;
+        #if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6) && defined(ENABLE_POINTCLOUD_OUTPUT)
+            pc_pkt_t* out_pcloud_buffer;
+            u32 out_pcloud_buffer_size;
+        #endif
+        u16 *depth_buffer;
+        u32 depth_buffer_size;
+        unsigned char *confidence_map_buffer;
     #endif
     Utils *utils;
     V4L2 *v4l2;
-    u16 *depth_buffer;
-    u32 depth_buffer_size;
-    #if 0 //defined(ENABLE_DYNAMICALLY_UPDATE_ROI_SRAM_CONTENT)
-        u16 *merged_depth_buffer;
-        uint32_t merged_frame_cnt;
-    #endif
     unsigned char *rgb_buffer;
-    unsigned char *confidence_map_buffer;
     uint32_t outputed_frame_cnt;
     int stop_req_code;
     bool save_frame(unsigned int frm_sequence, void *frm_buf, int buf_size, int frm_w, int frm_h, struct timeval frm_timestamp, enum frame_data_type);

@@ -13,8 +13,8 @@
 
 #define VERSION_MAJOR                           3
 #define VERSION_MINOR                           2
-#define VERSION_REVISION                        9
-#define LAST_MODIFIED_TIME                      "202500818A"
+#define VERSION_REVISION                        20
+#define LAST_MODIFIED_TIME                      "202500920A"
 
 #define DEFAULT_DTOF_FRAMERATE                  AdapsFramerateType30FPS // AdapsFramerateType60FPS
 
@@ -87,17 +87,19 @@
 #define ENV_VAR_RAW_FILE_REPLAY_ENABLE          "raw_file_replay_enable"
 #define ENV_VAR_DEPTH16_FILE_REPLAY_ENABLE      "depth16_file_replay_enable"
 #define ENV_VAR_FRAME_DROP_CHECK_ENABLE         "frame_drop_check_enable"
+#define ENV_VAR_SAVE_LOADED_DATA_ENABLE         "save_loaded_data_enable"
 
-#define ENV_VAR_ROI_SRAM_DATA_INJECTION         "roi_sram_data_injection"
 #define ENV_VAR_FORCE_ROW_SEARCH_RANGE          "force_row_search_range"
 #define ENV_VAR_FORCE_COLUMN_SEARCH_RANGE       "force_column_search_range"
 #define ENV_VAR_FORCE_COARSE_EXPOSURE           "force_coarseExposure"
 #define ENV_VAR_FORCE_FINE_EXPOSURE             "force_fineExposure"
 #define ENV_VAR_FORCE_GRAY_EXPOSURE             "force_grayExposure"
+#define ENV_VAR_FORCE_LASEREXPOSUREPERIOD       "force_laserExposurePeriod"
+#define ENV_VAR_FORCE_ROI_SRAM_SIZE             "force_roi_sram_size"
 
 #define ENV_VAR_DBGINFO_ENABLE                  "debug_info_enable"
 #define ENV_VAR_TRACE_ROI_SRAM_SWITCH           "trace_roi_sram_switch"
-#define ENV_VAR_DEBUG_ALGO_LIB_RET_VALUE        "debug_algo_lib_ret_value"
+#define ENV_VAR_TRACE_ALGO_LIB_DECODE_COSTTIME  "trace_algo_lib_decode_costtime"
 
 #define ENV_VAR_DUMP_LENS_INTRINSIC             "dump_lens_intrinsic"
 #define ENV_VAR_DUMP_ROI_SRAM_SIZE              "dump_roi_sram_size"

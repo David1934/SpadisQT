@@ -66,6 +66,11 @@ public:
     bool is_roi_sram_rolling();
     int set_roi_sram_rolling(bool val);
 
+    UINT8* get_mmap_address_4_loaded_roisram();
+    int set_mmap_address_4_loaded_roisram(UINT8* addr);
+    UINT32 get_size_4_loaded_roisram();
+    int set_size_4_loaded_roisram(UINT32 bytes);
+
     UINT8* get_loaded_walkerror_data();
     int set_loaded_walkerror_data(UINT8* value);
     UINT32 get_loaded_walkerror_data_size();
@@ -87,8 +92,8 @@ public:
 
     int get_spotSearchingRange(UINT8 *rowSearchingRange, UINT8 *colSearchingRange);
     int set_spotSearchingRange(UINT8 rowSearchingRange, UINT8 colSearchingRange);
-    int get_usrCfgExposureValues(UINT8 *coarseExposure, UINT8 *fineExposure, UINT8 *grayExposure);
-    int set_usrCfgExposureValues(UINT8 coarseExposure, UINT8 fineExposure, UINT8 grayExposure);
+    int get_usrCfgExposureValues(UINT8 *coarseExposure, UINT8 *fineExposure, UINT8 *grayExposure, UINT8 *laserExposurePeriod);
+    int set_usrCfgExposureValues(UINT8 coarseExposure, UINT8 fineExposure, UINT8 grayExposure, UINT8 laserExposurePeriod);
 #endif
 
 private:
@@ -117,6 +122,8 @@ private:
     UINT32 loaded_walkerror_data_size;
     UINT8 *loaded_spotoffset_data;
     UINT32 loaded_spotoffset_data_size;
+    UINT8 *mmap_address_4_loaded_roisram;
+    UINT32 size_4_loaded_roisram;
     Misc_Device     *misc_dev_instance;
     UINT8 anchor_rowOffset;
     UINT8 anchor_colOffset;
@@ -125,6 +132,7 @@ private:
     UINT8 usrCfgGrayExposure;
     UINT8 usrCfgCoarseExposure;
     UINT8 usrCfgFineExposure;
+    UINT8 usrCfgLaserExposurePeriod;
 
     AdapsMeasurementType string_2_measurementtype(QString& str);
     AdapsEnvironmentType string_2_environmenttype(QString& str);

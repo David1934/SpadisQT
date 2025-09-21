@@ -5,8 +5,11 @@
 #include "host_device_comm_types.h"
 #include "globalapplication.h"
 
-#define CLEAR(x) memset(&(x), 0, sizeof(x))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define CLEAR(x)                            memset(&(x), 0, sizeof(x))
+#define MAX(a, b)                           ((a) > (b) ? (a) : (b))
+
+#define REG_NULL                            0xFF
+#define REG16_NULL                          0xFFFF
 
 inline void EepromGetSwiftDeviceNumAddress(uint32_t* offset, uint32_t* length) {
     *offset = ADS6401_EEPROM_VERSION_INFO_OFFSET;
@@ -125,8 +128,6 @@ Misc_Device::Misc_Device()
     mapped_script_vcsel_settings = NULL_POINTER;
     sensor_reg_setting_cnt = 0;
     vcsel_reg_setting_cnt = 0;
-    loaded_roi_sram_size = 0;
-    loaded_roi_sram_rolling = false;
     // mmap_buffer_max_size should be a multiple of PAGE_SIZE (4096, for Linux kernel memory management)
     mmap_buffer_max_size = MAX(SPOT_MODULE_EEPROM_CAPACITY_SIZE,FLOOD_MODULE_EEPROM_CAPACITY_SIZE)
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
@@ -157,6 +158,7 @@ Misc_Device::Misc_Device()
         mapped_script_sensor_settings = (u8*)(mapped_eeprom_data_buffer + MAX(SPOT_MODULE_EEPROM_CAPACITY_SIZE,FLOOD_MODULE_EEPROM_CAPACITY_SIZE));
         mapped_script_vcsel_settings = (u8* ) (mapped_script_sensor_settings + ROI_SRAM_BUF_MAX_SIZE);
         mapped_roi_sram_data = mapped_script_vcsel_settings + REG_SETTING_BUF_MAX_SIZE_PER_SEG;
+        qApp->set_mmap_address_4_loaded_roisram(mapped_roi_sram_data);
 
         if (0 > read_dtof_module_static_data())
         {
@@ -479,7 +481,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
     return 0;
 }
 
-int Misc_Device::send_down_external_config(const UINT8 workMode, const uint32_t script_buf_size, const uint8_t* script_buf, const uint32_t roi_sram_size, const uint8_t* roi_sram_data, const bool roi_sram_rolling)
+int Misc_Device::send_down_external_config(const UINT8 workMode, const uint32_t script_buf_size, const uint8_t* script_buf)
 {
     ScriptItem *pstrItems = NULL_POINTER;
     uint32_t ulItemsBufSize = MAX_SCRIPT_ITEM_COUNT * sizeof(ScriptItem);
@@ -518,18 +520,24 @@ int Misc_Device::send_down_external_config(const UINT8 workMode, const uint32_t 
 
     }
 
-    memcpy(mapped_roi_sram_data, roi_sram_data, roi_sram_size);
-    loaded_roi_sram_size = roi_sram_size;
-    loaded_roi_sram_rolling = roi_sram_rolling;
-
     ex_cfg_script_param.work_mode = workMode;
     ex_cfg_script_param.sensor_reg_setting_cnt = sensor_reg_setting_cnt;
     ex_cfg_script_param.vcsel_reg_setting_cnt = vcsel_reg_setting_cnt;
-    ex_cfg_script_param.roi_sram_rolling = roi_sram_rolling;
-    ex_cfg_script_param.roi_sram_size = roi_sram_size;
     ret = write_external_config_script(&ex_cfg_script_param);
-    DBG_NOTICE("write_external_config_script() ret: %d, workMode: %d, vcsel_reg_setting_cnt:%d, sensor_reg_setting_cnt: %d, roi_sram_rolling: %d, roi_sram_size: %d---\n",
-        ret, workMode, vcsel_reg_setting_cnt, sensor_reg_setting_cnt, roi_sram_rolling, roi_sram_size);
+    DBG_NOTICE("write_external_config_script() ret: %d, workMode: %d, vcsel_reg_setting_cnt:%d, sensor_reg_setting_cnt: %d---\n",
+        ret, workMode, vcsel_reg_setting_cnt, sensor_reg_setting_cnt);
+
+    return ret;
+}
+
+int Misc_Device::send_down_loaded_roisram_data_size(const uint32_t roi_sram_size)
+{
+    int ret = 0;
+    external_roisram_data_size_t ex_roisram_data_param;
+
+    ex_roisram_data_param.roi_sram_size = roi_sram_size;
+    ret = write_external_roisram_data_size(&ex_roisram_data_param);
+    DBG_NOTICE("write_external_roisram_data_size() ret: %d, roi_sram_size: %d---\n", ret, roi_sram_size);
 
     return ret;
 }
@@ -579,7 +587,16 @@ int Misc_Device::write_external_config_script(external_config_script_param_t *pa
 {
     int ret = misc_ioctl(fd_4_misc, ADTOF_SET_EXTERNAL_CONFIG_SCRIPT, param);
     if (-1 == ret) {
-        errno_debug("ADTOF_ENABLE_SCRIPT_START");
+        errno_debug("ADTOF_SET_EXTERNAL_CONFIG_SCRIPT");
+    }
+    return ret;
+}
+
+int Misc_Device::write_external_roisram_data_size(external_roisram_data_size_t *param)
+{
+    int ret = misc_ioctl(fd_4_misc, ADTOF_SET_EXTERNAL_ROISRAM_DATA_SIZE, param);
+    if (-1 == ret) {
+        errno_debug("ADTOF_SET_EXTERNAL_ROISRAM_DATA_SIZE");
     }
     return ret;
 }
@@ -976,14 +993,6 @@ int Misc_Device::get_dtof_module_static_data(void **pp_module_static_data, void 
         // TODO for big FoV module
         *eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
     }
-
-    return 0;
-}
-
-int Misc_Device::get_loaded_roi_sram_data_info(void **pp_roisram_data_buffer, uint32_t *roisram_data_size)
-{
-    *pp_roisram_data_buffer = mapped_roi_sram_data;
-    *roisram_data_size = loaded_roi_sram_size;
 
     return 0;
 }

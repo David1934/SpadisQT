@@ -30,8 +30,6 @@ typedef int64_t             INT64;
 #define FALSE                               0
 #endif // !defined (FALSE)
 
-#define REG_NULL                            0xFF
-#define REG16_NULL                          0xFFFF
 #define MAX_REG_SETTING_COUNT               100
 #define MAX_SCRIPT_ITEM_COUNT               400
 

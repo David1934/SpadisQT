@@ -412,6 +412,34 @@ int GlobalApplication::set_loaded_walkerror_data_size(UINT32 value)
     return ret;
 }
 
+UINT8* GlobalApplication::get_mmap_address_4_loaded_roisram()
+{
+    return mmap_address_4_loaded_roisram;
+}
+
+int GlobalApplication::set_mmap_address_4_loaded_roisram(UINT8* addr)
+{
+    int ret = 0;
+
+    mmap_address_4_loaded_roisram = addr;
+
+    return ret;
+}
+
+UINT32 GlobalApplication::get_size_4_loaded_roisram()
+{
+    return size_4_loaded_roisram;
+}
+
+int GlobalApplication::set_size_4_loaded_roisram(UINT32 bytes)
+{
+    int ret = 0;
+
+    size_4_loaded_roisram = bytes;
+
+    return ret;
+}
+
 float* GlobalApplication::get_loaded_spotoffset_data()
 {
     return (float *) loaded_spotoffset_data;
@@ -494,24 +522,26 @@ int GlobalApplication::set_spotSearchingRange(UINT8 rowRange, UINT8 colRange)
     return ret;
 }
 
-int GlobalApplication::get_usrCfgExposureValues(UINT8 *coarseExposure, UINT8 *fineExposure, UINT8 *grayExposure)
+int GlobalApplication::get_usrCfgExposureValues(UINT8 *coarseExposure, UINT8 *fineExposure, UINT8 *grayExposure, UINT8 *laserExposurePeriod)
 {
     int ret = 0;
 
     *coarseExposure = usrCfgCoarseExposure;
     *fineExposure = usrCfgFineExposure;
     *grayExposure = usrCfgGrayExposure;
+    *laserExposurePeriod = usrCfgLaserExposurePeriod;
 
     return ret;
 }
 
-int GlobalApplication::set_usrCfgExposureValues(UINT8 coarseExposure, UINT8 fineExposure, UINT8 grayExposure)
+int GlobalApplication::set_usrCfgExposureValues(UINT8 coarseExposure, UINT8 fineExposure, UINT8 grayExposure, UINT8 laserExposurePeriod)
 {
     int ret = 0;
 
     usrCfgCoarseExposure = coarseExposure;
     usrCfgFineExposure = fineExposure;
     usrCfgGrayExposure = grayExposure;
+    usrCfgLaserExposurePeriod = laserExposurePeriod;
 
     return ret;
 }

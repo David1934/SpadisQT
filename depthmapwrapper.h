@@ -1,7 +1,13 @@
 #ifndef __DEPTHMAP_WRAPPER_H__
 #define __DEPTHMAP_WRAPPER_H__
 
+#define ALGO_LIB_VERSION_MAJOR                           3
+#define ALGO_LIB_VERSION_MINOR                           6
+#define ALGO_LIB_VERSION_REVISION                        4
 
+#define VERSION_HEX_VALUE(major, minor, revision)        (major << 16 | minor << 8 | revision)
+
+#define ALGO_LIB_VERSION_CODE                            VERSION_HEX_VALUE(ALGO_LIB_VERSION_MAJOR, ALGO_LIB_VERSION_MINOR << 8, ALGO_LIB_VERSION_REVISION)
 
 // ***** start to move some definition to here to let SpadisQT build pass ****
 #include "adaps_types.h"
@@ -135,6 +141,13 @@ typedef struct {
     WrapperDepthFormat format;
     WrapperDepthFormatParams formatParams;
     struct AdapsSparsePointPositionData sPPData;
+#if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6)
+    uint8_t*  out_depth_image;
+    pc_pkt_t* out_pcloud_image;
+    int32_t out_image_fd;
+    uint32_t  out_image_length;
+    uint32_t* count_pt_cloud;
+#else
     union
     {
         uint8_t*  out_depth_image;
@@ -146,8 +159,10 @@ typedef struct {
         uint32_t  out_image_length;
         uint32_t* count_pt_cloud;
     };
+#endif
+
 #if !defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
-    struct SpotPoint* (*outAllPointsPtr)[ZONE_SIZE][SWIFT_SPOT_COUNTS_PER_ZONE];
+    struct SpotPoint* (*outAllPointsPtr)[MAX_SRAM_DATA_NUMBERS][ZONE_SIZE][SWIFT_SPOT_COUNTS_PER_ZONE];
 #endif
 } WrapperDepthOutput;
 
@@ -158,6 +173,12 @@ typedef struct {
     int32_t in_image_fd;
 #else
     int32_t in_image_size;
+    int* in_sram_id;            // just for offline re-playback, added @ V3.5.4 of libadaps_swift_decode.so
+#endif
+
+#if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 6, 2)
+    bool dump_data;
+    const char* save_path;
 #endif
 } WrapperDepthInput;
 
