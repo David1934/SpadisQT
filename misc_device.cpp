@@ -6,10 +6,11 @@
 #include "globalapplication.h"
 
 #define CLEAR(x)                            memset(&(x), 0, sizeof(x))
-#define MAX(a, b)                           ((a) > (b) ? (a) : (b))
 
 #define REG_NULL                            0xFF
 #define REG16_NULL                          0xFFFF
+
+#define errno_debug(fmt)                    DBG_ERROR("%s error %d, %s\n", (fmt), errno, strerror(errno))
 
 inline void EepromGetSwiftDeviceNumAddress(uint32_t* offset, uint32_t* length) {
     *offset = ADS6401_EEPROM_VERSION_INFO_OFFSET;
@@ -122,6 +123,7 @@ Misc_Device::Misc_Device()
 {
     p_spot_module_eeprom = NULL_POINTER;
     p_flood_module_eeprom = NULL_POINTER;
+    p_bigfov_module_eeprom = NULL_POINTER;
     mmap_buffer_base = NULL_POINTER;
     mapped_eeprom_data_buffer = NULL_POINTER;
     mapped_script_sensor_settings = NULL_POINTER;
@@ -129,7 +131,7 @@ Misc_Device::Misc_Device()
     sensor_reg_setting_cnt = 0;
     vcsel_reg_setting_cnt = 0;
     // mmap_buffer_max_size should be a multiple of PAGE_SIZE (4096, for Linux kernel memory management)
-    mmap_buffer_max_size = MAX(SPOT_MODULE_EEPROM_CAPACITY_SIZE,FLOOD_MODULE_EEPROM_CAPACITY_SIZE)
+    mmap_buffer_max_size = MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
         + (PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROTATION_GROUP_CNT);
@@ -155,7 +157,7 @@ Misc_Device::Misc_Device()
             return;
         }
         mapped_eeprom_data_buffer = (u8* ) mmap_buffer_base;
-        mapped_script_sensor_settings = (u8*)(mapped_eeprom_data_buffer + MAX(SPOT_MODULE_EEPROM_CAPACITY_SIZE,FLOOD_MODULE_EEPROM_CAPACITY_SIZE));
+        mapped_script_sensor_settings = (u8*)(mapped_eeprom_data_buffer + MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA);
         mapped_script_vcsel_settings = (u8* ) (mapped_script_sensor_settings + ROI_SRAM_BUF_MAX_SIZE);
         mapped_roi_sram_data = mapped_script_vcsel_settings + REG_SETTING_BUF_MAX_SIZE_PER_SEG;
         qApp->set_mmap_address_4_loaded_roisram(mapped_roi_sram_data);
@@ -188,6 +190,11 @@ Misc_Device::~Misc_Device()
     {
         p_flood_module_eeprom = NULL_POINTER;
     }
+    if (NULL_POINTER != p_bigfov_module_eeprom)
+    {
+        p_bigfov_module_eeprom = NULL_POINTER;
+    }
+
     if ((0 != fd_4_misc) && (-1 == close(fd_4_misc))) {
         DBG_ERROR("Fail to close device %d (%s), errno: %s (%d)...", fd_4_misc, devnode_4_misc,
             strerror(errno), errno);
@@ -366,7 +373,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
     vcsel_reg_setting_cnt = 0;
     sensor_settings = (struct setting_rvd *) mapped_script_sensor_settings;
     memset(mapped_script_sensor_settings, 0, sizeof(struct setting_rvd)*MAX_REG_SETTING_COUNT);
-    if (MODULE_TYPE_FLOOD != module_static_data.module_type)
+    if (ADS6401_MODULE_SMALL_FLOOD != module_static_data.module_type)
     {
         vcsel_opn7020_settings = (struct setting_rvd *) mapped_script_vcsel_settings;
         memset(mapped_script_vcsel_settings, 0, sizeof(struct setting_rvd)*MAX_REG_SETTING_COUNT);
@@ -396,7 +403,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
                 }
                 sensor_reg_setting_cnt++;
             }
-            else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i].i2c_addr) && (MODULE_TYPE_FLOOD != module_static_data.module_type))
+            else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i].i2c_addr) && (ADS6401_MODULE_SMALL_FLOOD != module_static_data.module_type))
             {
                 vcsel_opn7020_settings[vcsel_reg_setting_cnt].reg = pstrItems[i].reg_addr;
                 vcsel_opn7020_settings[vcsel_reg_setting_cnt].val = pstrItems[i].reg_val;
@@ -407,7 +414,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
                 }
                 vcsel_reg_setting_cnt++;
             }
-            else if ((MCUCTRL_I2C_ADDR_4_FLOOD_IN_SCRIPT == pstrItems[i].i2c_addr) && (MODULE_TYPE_FLOOD == module_static_data.module_type))
+            else if ((MCUCTRL_I2C_ADDR_4_FLOOD_IN_SCRIPT == pstrItems[i].i2c_addr) && (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type))
             {
                 vcsel_PhotonIC5015_settings[vcsel_reg_setting_cnt].reg = pstrItems[i].reg_addr;
                 vcsel_PhotonIC5015_settings[vcsel_reg_setting_cnt].val = pstrItems[i].reg_val;
@@ -433,7 +440,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
                         }
                     }
                 }
-                else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i - 1].i2c_addr) && (MODULE_TYPE_FLOOD != module_static_data.module_type))
+                else if ((VCSEL_OPN7020_I2C_ADDR_IN_SCRIPT == pstrItems[i - 1].i2c_addr) && (ADS6401_MODULE_SMALL_FLOOD != module_static_data.module_type))
                 {
                     if (vcsel_reg_setting_cnt > 1)
                     {
@@ -444,7 +451,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
                         }
                     }
                 }
-                else if ((MCUCTRL_I2C_ADDR_4_FLOOD_IN_SCRIPT == pstrItems[i - 1].i2c_addr) && (MODULE_TYPE_FLOOD == module_static_data.module_type))
+                else if ((MCUCTRL_I2C_ADDR_4_FLOOD_IN_SCRIPT == pstrItems[i - 1].i2c_addr) && (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type))
                 {
                     if (vcsel_reg_setting_cnt > 1)
                     {
@@ -465,7 +472,7 @@ int Misc_Device::parse_items(const uint32_t ulItemsCount, const ScriptItem *pstr
     sensor_settings[sensor_reg_setting_cnt].delayUs = 0;
     sensor_reg_setting_cnt++;
 
-    if (MODULE_TYPE_FLOOD != module_static_data.module_type)
+    if (ADS6401_MODULE_SMALL_FLOOD != module_static_data.module_type)
     {
         vcsel_opn7020_settings[vcsel_reg_setting_cnt].reg = REG_NULL;
         vcsel_opn7020_settings[vcsel_reg_setting_cnt].val = 0x00;
@@ -601,26 +608,6 @@ int Misc_Device::write_external_roisram_data_size(external_roisram_data_size_t *
     return ret;
 }
 
-bool Misc_Device::save_dtof_calib_eeprom_param(void *buf, int len)
-{
-    QDateTime       localTime = QDateTime::currentDateTime();
-    QString         currentTime = localTime.toString("yyyyMMddhhmmss");
-    char *          LocalTimeStr = (char *) currentTime.toStdString().c_str();
-    char *          filename = new char[50];
-
-    sprintf(filename, "%s%s.eeprom",DATA_SAVE_PATH,LocalTimeStr);
-    Utils *utils = new Utils();
-    utils->save_binary_file(filename, buf, 
-        len,
-        __FUNCTION__,
-        __LINE__
-        );
-    delete utils;
-    delete[] filename;
-
-    return true;
-}
-
 void* Misc_Device::get_dtof_exposure_param(void)
 {
     return &exposureParam;
@@ -659,16 +646,15 @@ void* Misc_Device::get_dtof_calib_eeprom_param(void)
         }
     }
 
-    if (MODULE_TYPE_SPOT == module_static_data.module_type)
+    if (ADS6401_MODULE_SPOT == module_static_data.module_type)
     {
         return p_spot_module_eeprom;
     }
-    else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
+    else if (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type) {
         return p_flood_module_eeprom;
     }
     else {
-        //return NULL; // TODO: add eeprom for big fov flood module
-        return p_spot_module_eeprom;
+        return p_bigfov_module_eeprom;
     }
 
 }
@@ -703,11 +689,6 @@ int Misc_Device::check_crc8_4_spot_calib_eeprom_param(void)
     uint8_t checkSum[SPOT_MODULE_CHECKSUM_SIZE] = { 0 };
     uint8_t *pEEPROMData = (uint8_t *) p_spot_module_eeprom;
     int eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
-
-    if (Utils::is_env_var_true(ENV_VAR_SAVE_EEPROM_ENABLE))
-    {
-        save_dtof_calib_eeprom_param(pEEPROMData, eeprom_data_size);
-    }
 
     EepromGetSwiftChecksumAddress(&offset, &length);
     memcpy(checkSum, pEEPROMData + offset, length);
@@ -819,12 +800,6 @@ int Misc_Device::check_crc32_4_flood_calib_eeprom_param(void)
     uint32_t read_crc32 = 0;
     uint32_t calc_crc32 = 0;
     uint8_t *pEEPROMData = (uint8_t *) p_flood_module_eeprom;
-    int eeprom_data_size = sizeof(swift_flood_module_eeprom_data_t);
-
-    if (Utils::is_env_var_true(ENV_VAR_SAVE_EEPROM_ENABLE))
-    {
-        save_dtof_calib_eeprom_param(pEEPROMData, eeprom_data_size);
-    }
 
     Utils *utils = new Utils();
 
@@ -926,6 +901,71 @@ int Misc_Device::check_crc32_4_flood_calib_eeprom_param(void)
     return ret;
 }
 
+int Misc_Device::dump_eeprom_data(u8* pEEPROM_Data)
+{
+    if (ADS6401_MODULE_SPOT == module_static_data.module_type)
+    {
+    }
+    else if (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type) {
+    }
+    else {
+        swift_eeprom_v2_data_t *bigfov_module_eeprom = (swift_eeprom_v2_data_t *) pEEPROM_Data;
+        
+        DBG_NOTICE("//HEAD");
+        DBG_NOTICE("uint32_t    magic_id;                               = 0x%x", bigfov_module_eeprom->magic_id);
+        DBG_NOTICE("uint32_t    data_structure_version;                 = 0x%x", bigfov_module_eeprom->data_structure_version);
+        DBG_NOTICE("uint8_t     calibrationInfo[32];                    = [%s]", bigfov_module_eeprom->calibrationInfo);
+        DBG_NOTICE("uint8_t     LastCalibratedTime[32];                 = [%s]", bigfov_module_eeprom->LastCalibratedTime);
+        DBG_NOTICE("uint8_t     serialNumber[BIG_FOV_MODULE_SN_LENGTH]; = [%s]", bigfov_module_eeprom->serialNumber);
+        DBG_NOTICE("uint32_t    data_length;                            = %d", bigfov_module_eeprom->data_length);
+        DBG_NOTICE("uint32_t    data_crc32;                             = 0x%x", bigfov_module_eeprom->data_crc32);
+        DBG_NOTICE("uint32_t    compressed_data_length;                 = %d", bigfov_module_eeprom->compressed_data_length);
+        DBG_NOTICE("uint32_t    compressed_data_crc32;                  = 0x%x\n", bigfov_module_eeprom->compressed_data_crc32);
+        
+        DBG_NOTICE("//BASIC_DATA");
+        DBG_NOTICE("uint8_t     real_spot_zone_count;                   = %d", bigfov_module_eeprom->real_spot_zone_count);
+        DBG_NOTICE("uint8_t     tdcDelay[2];                            = [0x%x,0x%x]", bigfov_module_eeprom->tdcDelay[0], bigfov_module_eeprom->tdcDelay[1]);
+        DBG_NOTICE("uint8_t     lensType;                               = %d", bigfov_module_eeprom->lensType);
+        DBG_NOTICE("float       indoorCalibTemperature;                 = %f", bigfov_module_eeprom->indoorCalibTemperature);
+        DBG_NOTICE("float       indoorCalibRefDistance;                 = %f", bigfov_module_eeprom->indoorCalibRefDistance);
+        DBG_NOTICE("float       outdoorCalibTemperature;                = %f", bigfov_module_eeprom->outdoorCalibTemperature);
+        DBG_NOTICE("float       outdoorCalibRefDistance;                = %f", bigfov_module_eeprom->outdoorCalibRefDistance);
+        DBG_NOTICE("float       intrinsic[9];                           = [%f,%f,%f,%f,%f,%f,%f,%f,%f]", 
+            bigfov_module_eeprom->intrinsic[0],
+            bigfov_module_eeprom->intrinsic[1],
+            bigfov_module_eeprom->intrinsic[2],
+            bigfov_module_eeprom->intrinsic[3],
+            bigfov_module_eeprom->intrinsic[4],
+            bigfov_module_eeprom->intrinsic[5],
+            bigfov_module_eeprom->intrinsic[6],
+            bigfov_module_eeprom->intrinsic[7],
+            bigfov_module_eeprom->intrinsic[8]
+            );
+        DBG_NOTICE("float       rgb_intrinsic[8];                       = [%f,%f,%f,%f,%f,%f,%f,%f]", 
+            bigfov_module_eeprom->rgb_intrinsic[0],
+            bigfov_module_eeprom->rgb_intrinsic[1],
+            bigfov_module_eeprom->rgb_intrinsic[2],
+            bigfov_module_eeprom->rgb_intrinsic[3],
+            bigfov_module_eeprom->rgb_intrinsic[4],
+            bigfov_module_eeprom->rgb_intrinsic[5],
+            bigfov_module_eeprom->rgb_intrinsic[6],
+            bigfov_module_eeprom->rgb_intrinsic[7]
+            );
+        DBG_NOTICE("float       common_extrinsic[8];                    = [%f,%f,%f,%f,%f,%f,%f]", 
+            bigfov_module_eeprom->common_extrinsic[0],
+            bigfov_module_eeprom->common_extrinsic[1],
+            bigfov_module_eeprom->common_extrinsic[2],
+            bigfov_module_eeprom->common_extrinsic[3],
+            bigfov_module_eeprom->common_extrinsic[4],
+            bigfov_module_eeprom->common_extrinsic[5],
+            bigfov_module_eeprom->common_extrinsic[6]
+            );
+        DBG_NOTICE("uint8_t     Reserved[20]\n");
+    }
+
+    return 0;
+}
+
 int Misc_Device::read_dtof_module_static_data(void)
 {
     int ret = 0;
@@ -939,31 +979,53 @@ int Misc_Device::read_dtof_module_static_data(void)
         DBG_NOTICE("module_type: 0x%x, ready: %d", module_static_data.module_type, module_static_data.ready);
         if (module_static_data.ready)
         {
+            uint8_t *pEEPROMData;
+            int eeprom_data_size;
+
             qApp->set_module_type(module_static_data.module_type);
 
-            if (MODULE_TYPE_SPOT == module_static_data.module_type)
+            if (ADS6401_MODULE_SPOT == module_static_data.module_type)
             {
                 p_spot_module_eeprom = (swift_spot_module_eeprom_data_t *) mapped_eeprom_data_buffer;
                 qApp->set_anchorOffset(0, 1); // set default anchor Offset (in case no host_comm) for spot module, may be changed from PC SpadisApp.
+
+                pEEPROMData = (uint8_t *) p_spot_module_eeprom;
+                eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
             }
-            else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
+            else if (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type) {
                 p_flood_module_eeprom = (swift_flood_module_eeprom_data_t *) mapped_eeprom_data_buffer;
                 qApp->set_anchorOffset(0, 0); // non-spot module does not need anchor preprocess
+
+                pEEPROMData = (uint8_t *) p_flood_module_eeprom;
+                eeprom_data_size = sizeof(swift_flood_module_eeprom_data_t);
             }
             else {
-                // TODO for big FoV module
-                p_spot_module_eeprom = (swift_spot_module_eeprom_data_t *) mapped_eeprom_data_buffer;
+                p_bigfov_module_eeprom = (swift_eeprom_v2_data_t *) mapped_eeprom_data_buffer;
+                if (true == Utils::is_env_var_true(ENV_VAR_DUMP_EEPROM_DATA))
+                {
+                    dump_eeprom_data(mapped_eeprom_data_buffer);
+                }
                 qApp->set_anchorOffset(0, 0); // non-spot module does not need anchor preprocess
+
+                pEEPROMData = (uint8_t *) p_bigfov_module_eeprom;
+                eeprom_data_size = sizeof(swift_eeprom_v2_data_t);
+            }
+
+            if (Utils::is_env_var_true(ENV_VAR_SAVE_EEPROM_ENABLE))
+            {
+                Utils *utils = new Utils();
+                utils->save_dtof_eeprom_calib_data_2_file(pEEPROMData, eeprom_data_size);
+                delete utils;
             }
 
             if (false == Utils::is_env_var_true(ENV_VAR_SKIP_EEPROM_CRC_CHK))
             {
-                if (MODULE_TYPE_SPOT == module_static_data.module_type)
+                if (ADS6401_MODULE_SPOT == module_static_data.module_type)
                 {
                     ret = check_crc8_4_spot_calib_eeprom_param();
                     ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
                 }
-                else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
+                else if (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type) {
                     ret = check_crc32_4_flood_calib_eeprom_param();
                     ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
                 }
@@ -982,16 +1044,15 @@ int Misc_Device::get_dtof_module_static_data(void **pp_module_static_data, void 
 {
     *pp_module_static_data = (void *) &module_static_data;
     *pp_eeprom_data_buffer = mapped_eeprom_data_buffer;
-    if (MODULE_TYPE_SPOT == module_static_data.module_type)
+    if (ADS6401_MODULE_SPOT == module_static_data.module_type)
     {
         *eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
     }
-    else if (MODULE_TYPE_FLOOD == module_static_data.module_type) {
+    else if (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type) {
         *eeprom_data_size = sizeof(swift_flood_module_eeprom_data_t);
     }
     else {
-        // TODO for big FoV module
-        *eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
+        *eeprom_data_size = sizeof(swift_eeprom_v2_data_t);
     }
 
     return 0;
@@ -1021,7 +1082,7 @@ void* Misc_Device::get_dtof_runtime_status_param(void)
     return &last_runtime_status_param;
 }
 
-int Misc_Device::read_dtof_runtime_status_param(float *temperature)
+int Misc_Device::read_dtof_runtime_status_param(struct adaps_dtof_runtime_status_param **status_param)
 {
     int ret = 0;
     struct adaps_dtof_runtime_status_param param;
@@ -1036,10 +1097,17 @@ int Misc_Device::read_dtof_runtime_status_param(float *temperature)
         last_runtime_status_param.inside_temperature_x100 = param.inside_temperature_x100;
         last_runtime_status_param.expected_vop_abs_x100 = param.expected_vop_abs_x100;
         last_runtime_status_param.expected_pvdd_x100 = param.expected_pvdd_x100;
-    
-        *temperature = (float) ((double)param.inside_temperature_x100 /(double)100.0f);
-        //DBG_INFO("internal_temperature: %d, temperature: %f\n", param.inside_temperature_x100, *temperature);
+        *status_param = &last_runtime_status_param;
     }
+
+    return ret;
+}
+
+int Misc_Device::get_dtof_inside_temperature(float *temperature)
+{
+    int ret = 0;
+
+    *temperature = (float) ((double)last_runtime_status_param.inside_temperature_x100 /(double)100.0f);
 
     return ret;
 }

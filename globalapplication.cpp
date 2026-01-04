@@ -76,7 +76,7 @@ GlobalApplication::GlobalApplication(int argc, char *argv[]):QCoreApplication(ar
     loaded_spotoffset_data = nullptr;
     loaded_spotoffset_data_size = 0;
     walkerror_enable = false;
-    selected_module_type = MODULE_TYPE_SPOT;
+    selected_module_type = ADS6401_MODULE_SPOT;
     anchor_colOffset = 0;
     anchor_rowOffset = 0;
     rowSearchingRange = 2;
@@ -380,6 +380,20 @@ int GlobalApplication::set_RealDistanceMaxMappedRange(float value)
     int ret = 0;
 
     RealDistanceMaxMappedRange = value;
+
+    return ret;
+}
+
+UINT8 GlobalApplication::get_module_kernel_type()
+{
+    return module_kernel_type;
+}
+
+int GlobalApplication::set_module_kernel_type(UINT8 value)
+{
+    int ret = 0;
+
+    module_kernel_type = value;
 
     return ret;
 }

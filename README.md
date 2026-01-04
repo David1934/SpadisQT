@@ -8,14 +8,16 @@ and converted into depth or grayscale data. The depth information is then visual
 
 It has been tested on RK3568 with Linux 5.10 kernel.
 
-The application can be built with QT 5.x for Linux. (Note: Since the app uses V4L2 APIs, it cannot run on Windows.)
+The application can be built with QT 5.x for Linux. (Note: Since the app uses Linux V4L2 APIs, it cannot run on Windows.)
 
 Before building and running SpadisQT, ensure your development board supports QT.  
 Please study this requirement yourself, as we cannot answer such basic questions.
 
-There are two types of dToF modules based on the ADS6401 chip:  
-- **SPOT module**  
-- **FLOOD module**  
+There are four types of dToF modules based on the ADS6401 chip:  
+- **Spot module**  
+- **Small-Flood module**  
+- **Big FoV Flood module**  
+- **Big FoV V2 Flood module**  
 
 The Linux kernel driver (`ads6401`) reports the module type when the `ADAPS_GET_DTOF_MODULE_STATIC_DATA` ioctl command is executed.
 

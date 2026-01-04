@@ -55,9 +55,9 @@ private:
     V4L2 *v4l2;
     unsigned char *rgb_buffer;
     uint32_t outputed_frame_cnt;
+    uint32_t dumped_frame_cnt;
     int stop_req_code;
     bool save_frame(unsigned int frm_sequence, void *frm_buf, int buf_size, int frm_w, int frm_h, struct timeval frm_timestamp, enum frame_data_type);
-    void save_depth_txt_file(void *frm_buf,unsigned int frm_sequence,int frm_len);
 
 private slots:
 
@@ -72,7 +72,7 @@ private slots:
 signals:
 
     #if !defined(CONSOLE_APP_WITHOUT_GUI)
-        void newFrameReady4Display(QImage image, QImage img4confidence);
+        void newFrameReady4Display(unsigned int frm_sequence, QImage image, QImage img4confidence);
     #endif
     bool update_runtime_display(status_params2 param2);
     void threadLoopExit();

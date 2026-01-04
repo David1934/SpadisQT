@@ -25,35 +25,76 @@ typedef unsigned char                           BOOLEAN;
 typedef enum
 {
     // from PC to device side
+#if 1
     CMD_HOST_SIDE_SET_COLORMAP_RANGE_PARAM          = 0x0001,
     CMD_HOST_SIDE_GET_MODULE_STATIC_DATA            = 0x0002, // Host PC side sends a command to get the calibration data from the EEPROM and otp
-    CMD_HOST_SIDE_SET_ROI_SRAM_DATA                 = 0x0003,
+    CMD_HOST_SIDE_DOWNLOAD_ROI_SRAM_DATA            = 0x0003,
     CMD_HOST_SIDE_START_CAPTURE                     = 0x0004, // Host PC side sends a command to start data capture on the device side
     CMD_HOST_SIDE_STOP_CAPTURE                      = 0x0005, // Host PC side sends a command to stop data capture on the device side
     CMD_HOST_SIDE_SET_SENSOR_REGISTER               = 0x0006,
     CMD_HOST_SIDE_GET_SENSOR_REGISTER               = 0x0007,
     CMD_HOST_SIDE_SET_VCSLDRV_OP7020_REGISTER       = 0x0008,
     CMD_HOST_SIDE_GET_VCSLDRV_OP7020_REGISTER       = 0x0009,
-    CMD_HOST_SIDE_SET_SPOT_WALKERROR_DATA           = 0x000A,
-    CMD_HOST_SIDE_SET_SPOT_OFFSET_DATA              = 0x000B,
+    CMD_HOST_SIDE_DOWNLOAD_SPOT_WALKERROR_DATA      = 0x000A,
+    CMD_HOST_SIDE_DOWNLOAD_SPOT_OFFSET_DATA         = 0x000B,
     CMD_HOST_SIDE_SET_WALKERROR_ENABLE              = 0x000C,
-    CMD_HOST_SIDE_SET_EEPROM_DATA                   = 0x000D,
+    CMD_HOST_SIDE_UPDATE_EEPROM_DATA                = 0x000D,
     CMD_HOST_SIDE_SET_DEVICE_REBOOT                 = 0x000E,
     CMD_HOST_SIDE_SET_RTC_TIME                      = 0x000F,
     CMD_HOST_SIDE_SET_EXPOSURE_TIME                 = 0x0010,
-    CMD_HOST_SIDE_SET_REF_DISTANCE_DATA             = 0x0011,
-    CMD_HOST_SIDE_SET_LENS_INTRINSIC_DATA           = 0x0012,
+    CMD_HOST_SIDE_DOWNLOAD_REF_DISTANCE_DATA        = 0x0011,
+    CMD_HOST_SIDE_DOWNLOAD_LENS_INTRINSIC_DATA      = 0x0012,
     CMD_HOST_SIDE_SET_HISTOGRAM_DATA_REQ_POSITION   = 0x0013,
+    CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE            = 0x0014,  // for algo lib
 
     // from device side to PC side
-    CMD_DEVICE_SIDE_REPORT_MODULE_STATIC_DATA       = 0x1000, // Device side sends the static_module data as requested by the client's CMD_HOST_SIDE_GET_MODULE_STATIC_DATA command
-    CMD_DEVICE_SIDE_REPORT_FRAME_RAW_DATA           = 0x1001, // Device side sends the raw data as requested by the client's start capture command
+    CMD_DEVICE_SIDE_UPLOAD_MODULE_STATIC_DATA       = 0x1000, // Device side sends the static_module data as requested by the client's CMD_HOST_SIDE_GET_MODULE_STATIC_DATA command
+    CMD_DEVICE_SIDE_UPLOAD_FRAME_RAW_DATA           = 0x1001, // Device side sends the raw data as requested by the client's start capture command
     CMD_DEVICE_SIDE_REPORT_SENSOR_REGISTER          = 0x1002,
     CMD_DEVICE_SIDE_REPORT_VCSLDRV_OP7020_REGISTER  = 0x1003,
     CMD_DEVICE_SIDE_REPORT_STATUS                   = 0x1004,
-    CMD_DEVICE_SIDE_REPORT_FRAME_DEPTH16_DATA       = 0x1005, // Device side sends the depth16 data as requested by the client's start capture command
-    CMD_DEVICE_SIDE_REPORT_FRAME_POINTCLOUD_DATA    = 0x1006, // Device side sends the point-cloud data as requested by the client's start capture command
-    CMD_DEVICE_SIDE_REPORT_REQ_POS_HISTOGRAM_DATA   = 0x1007,
+    CMD_DEVICE_SIDE_UPLOAD_FRAME_DEPTH16_DATA       = 0x1005, // Device side sends the depth16 data as requested by the client's start capture command
+    CMD_DEVICE_SIDE_UPLOAD_FRAME_POINTCLOUD_DATA    = 0x1006, // Device side sends the point-cloud data as requested by the client's start capture command
+    CMD_DEVICE_SIDE_UPLOAD_REQ_POS_HISTOGRAM_DATA   = 0x1007,
+#else
+    CMD_HOST_SIDE_SET_RTC_TIME                      = 0x0001,
+    CMD_HOST_SIDE_GET_MODULE_STATIC_DATA            = 0x0002, // Host PC side sends a command to get the calibration data from the EEPROM and otp
+    CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE            = 0x0003,  // for algo lib
+    CMD_HOST_SIDE_SET_WALKERROR_ENABLE              = 0x0004,
+    CMD_HOST_SIDE_SET_EXPOSURE_TIME                 = 0x0005,
+    CMD_HOST_SIDE_SET_HISTOGRAM_DATA_REQ_POSITION   = 0x0006,  // optional
+    CMD_HOST_SIDE_SET_COLORMAP_RANGE_PARAM          = 0x0007,
+
+    CMD_HOST_SIDE_DOWNLOAD_ROI_SRAM_DATA            = 0x0008,
+    CMD_HOST_SIDE_DOWNLOAD_SPOT_WALKERROR_DATA      = 0x0009,
+    CMD_HOST_SIDE_DOWNLOAD_SPOT_OFFSET_DATA         = 0x000A,
+    CMD_HOST_SIDE_DOWNLOAD_REF_DISTANCE_DATA        = 0x000B,
+    CMD_HOST_SIDE_DOWNLOAD_LENS_INTRINSIC_DATA      = 0x000C,
+
+    CMD_HOST_SIDE_START_CAPTURE                     = 0x000D, // Host PC side sends a command to start data capture on the device side
+    CMD_HOST_SIDE_STOP_CAPTURE                      = 0x000E, // Host PC side sends a command to stop data capture on the device side
+    CMD_HOST_SIDE_SET_SENSOR_REGISTER               = 0x000F,
+    CMD_HOST_SIDE_GET_SENSOR_REGISTER               = 0x0010,
+    CMD_HOST_SIDE_SET_VCSLDRV_OP7020_REGISTER       = 0x0011,
+    CMD_HOST_SIDE_GET_VCSLDRV_OP7020_REGISTER       = 0x0012,
+    CMD_HOST_SIDE_UPDATE_EEPROM_DATA                = 0x0013,
+    CMD_HOST_SIDE_SET_DEVICE_REBOOT                 = 0x0014,
+
+
+
+
+    // from device side to PC side
+    CMD_DEVICE_SIDE_UPLOAD_MODULE_STATIC_DATA       = 0x1000, // Device side sends the static_module data as requested by the client's CMD_HOST_SIDE_GET_MODULE_STATIC_DATA command
+    CMD_DEVICE_SIDE_UPLOAD_FRAME_RAW_DATA           = 0x1001, // Device side sends the raw data as requested by the client's start capture command
+    CMD_DEVICE_SIDE_UPLOAD_FRAME_DEPTH16_DATA       = 0x1002, // Device side sends the depth16 data as requested by the client's start capture command
+    CMD_DEVICE_SIDE_UPLOAD_FRAME_POINTCLOUD_DATA    = 0x1003, // Device side sends the point-cloud data as requested by the client's start capture command
+    CMD_DEVICE_SIDE_UPLOAD_REQ_POS_HISTOGRAM_DATA   = 0x1004,
+
+    CMD_DEVICE_SIDE_REPORT_STATUS                   = 0x1005,
+    CMD_DEVICE_SIDE_REPORT_SENSOR_REGISTER          = 0x1006,
+    CMD_DEVICE_SIDE_REPORT_VCSLDRV_OP7020_REGISTER  = 0x1007,
+
+#endif
 } cmdType_t;
 
 typedef enum
@@ -73,6 +114,7 @@ typedef enum
     CMD_DEVICE_SIDE_ERROR_INVALID_EEPROM_UPD_PARAM  = 0x000B,
     CMD_DEVICE_SIDE_ERROR_INVALID_REBOOT_REASON     = 0x000C,
     CMD_DEVICE_SIDE_ERROR_CHKSUM_MISMATCH_IN_EEPROM = 0x000D,
+    CMD_DEVICE_SIDE_ERROR_INVALID_MODULE_KERNEL_TYPE= 0x000E,
 } error_code_t;
 
 typedef enum
@@ -81,6 +123,16 @@ typedef enum
     CMD_HOST_SIDE_REBOOT_NO_REASON                  = 0x0000, // Don't allow set to this one if PC side want to reboot device really.
     CMD_HOST_SIDE_REBOOT_FOR_EEPROM_UPDATE_DONE     = 0x0001,
 } device_reboot_reason_t;
+
+typedef enum
+{
+    // from PC to device side
+    MODULE_KERNEL_TYPE_SPOT,
+    MODULE_KERNEL_TYPE_FLOOD,
+    MODULE_KERNEL_TYPE_CAMSENSE,
+    MODULE_KERNEL_TYPE_T,
+    MODULE_KERNEL_TYPE_CNT,
+} module_kernel_t;
 
 #pragma pack(1)
 
@@ -237,7 +289,7 @@ typedef struct frame_buffer_param_s
 typedef struct module_static_data_s
 {
     UINT8                   data_type;              // refer to enum swift_data_type of this .h file
-    UINT32                  module_type;            // refer to ADS6401_MODULE_SPOT,ADS6401_MODULE_FLOOD and ADS6401_MODULE_BIG_FOV_FLOOD of adaps_types.h file
+    UINT32                  module_type;            // refer to ADS6401_MODULE_SPOT,ADS6401_MODULE_SMALL_FLOOD and ADS6401_MODULE_BIG_FOV_FLOOD of adaps_types.h file
     UINT32                  eeprom_capacity;        // unit is byte
     UINT16                  otp_vbe25;
     UINT16                  otp_vbd;        // unit is 10mv, or the related V X 100
@@ -263,6 +315,11 @@ typedef struct device_reboot_request_s
     UINT8                   reboot_reason_code;
     CHAR                    reboot_reason_msg[ERROR_MSG_MAX_LENGTH];
 } device_reboot_request_t;
+
+typedef struct module_kernel_param_s
+{
+    UINT8                   module_kernel_type;
+} module_kernel_param_t;
 
 #ifndef register_op_data_type
 #define register_op_data_type

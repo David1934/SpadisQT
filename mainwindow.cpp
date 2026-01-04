@@ -204,12 +204,13 @@ void MainWindow::startFrameProcessThread(void)
         return;
     }
 
+    displayedFrameCnt = 0;
     connect(frame_process_thread, SIGNAL(threadEnd(int)), this, SLOT(onThreadEnd(int)));
 
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
     qRegisterMetaType<enum frame_data_type>("enum frame_data_type");
-    connect(frame_process_thread, SIGNAL(newFrameReady4Display(QImage, QImage)),
-            this, SLOT(new_frame_display(QImage, QImage)));
+    connect(frame_process_thread, SIGNAL(newFrameReady4Display(unsigned int, QImage, QImage)),
+            this, SLOT(new_frame_display(unsigned int, QImage, QImage)));
     qRegisterMetaType<status_params2>("status_params2");
     connect(frame_process_thread, SIGNAL(update_runtime_display(status_params2)),
             this, SLOT(update_status_info(status_params2)));
@@ -217,9 +218,6 @@ void MainWindow::startFrameProcessThread(void)
     // 创建一个QShortcut对象，将Ctrl + C组合键与槽函数onCtrlCPressed关联起来
     QShortcut *shortcut_ctrlX = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_X), this);
     connect(shortcut_ctrlX, &QShortcut::activated, this, &MainWindow::onCtrl_X_Pressed);
-
-    QShortcut *shortcut_ctrlS = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_S), this);
-    connect(shortcut_ctrlS, &QShortcut::activated, this, &MainWindow::onCtrl_S_Pressed);
 
     ui->depth_view->installEventFilter(this); // for eventFilter()
 
@@ -331,8 +329,8 @@ void MainWindow::unixSignalHandler(int signal)
 {
     switch (signal) {
         case SIGTSTP:
-            DBG_NOTICE("CTRL-Z recieved, screen shot will be excuted!");
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
+            DBG_NOTICE("CTRL-Z recieved, screen shot will be excuted!");
             captureAndSaveScreenshot();
 #endif
             break;
@@ -596,7 +594,7 @@ void MainWindow::on_startCapture()
 #endif
         {
             // For flood module on Hisilicon platform, PCM mode always use Div3 since too high temperature
-            if (MODULE_TYPE_FLOOD == qApp->get_module_type()
+            if (ADS6401_MODULE_SMALL_FLOOD == qApp->get_module_type()
                  && WK_DTOF_PCM == qApp->get_wk_mode()
                 )
             {
@@ -688,7 +686,10 @@ bool MainWindow::update_status_info(status_params2 param2)
 #endif
 
     unsigned int streamed_time_seconds = param2.streamed_time_us / 1000000;
-
+#if 0
+    DBG_NOTICE("---------frm_sequence: %d, displayedFrameCnt: %d, displayed_fps: %d, mipi_rx_fps:%d ---\n",
+        param2.frm_sequence, displayedFrameCnt, displayed_fps, param2.mipi_rx_fps);
+#endif
     sprintf(temp_string, "%d (%d) fps", displayed_fps, param2.mipi_rx_fps);
     ui->framerate_value->setText(temp_string);
 
@@ -709,24 +710,23 @@ bool MainWindow::update_status_info(status_params2 param2)
         ui->cur_module_type_value->setText("RGB");
     }
     else {
-        if (MODULE_TYPE_SPOT == qApp->get_module_type())
+        if (ADS6401_MODULE_SPOT == qApp->get_module_type())
         {
             ui->cur_module_type_value->setText(SPOT_MODULE_TYPE_NAME);
         }
-        else if (MODULE_TYPE_FLOOD == qApp->get_module_type()) {
+        else if (ADS6401_MODULE_SMALL_FLOOD == qApp->get_module_type()) {
             ui->cur_module_type_value->setText(FLOOD_MODULE_TYPE_NAME);
+            ui->pvddLabel->setText("Cur expected vbat:");
+        }
+        else if (ADS6401_MODULE_BIG_FOV_FLOOD_V2 == qApp->get_module_type()) {
+            ui->cur_module_type_value->setText(BIG_FOV_FLOOD_V2_MODULE_TYPE_NAME);
         }
         else {
             ui->cur_module_type_value->setText(BIG_FOV_FLOOD_MODULE_TYPE_NAME);
         }
 
-    #if defined(CONFIG_ADAPS_SWIFT_FLOOD)
-        ui->pvddLabel->setVisible(false);
-        ui->cur_exp_pvdd_value->setVisible(false);
-    #else
         sprintf(temp_string, "%d.%02d V", param2.curr_exp_pvdd/100, param2.curr_exp_pvdd%100);
         ui->cur_exp_pvdd_value->setText(temp_string);
-    #endif
     }
 
     sprintf(temp_string, "%d.%02d ℃", param2.curr_temperature/100, param2.curr_temperature%100);
@@ -791,7 +791,7 @@ bool MainWindow::update_status_info(status_params2 param2)
     return true;
 }
 
-bool MainWindow::new_frame_display(QImage image, QImage img4confidence)
+bool MainWindow::new_frame_display(unsigned int frm_sequence, QImage image, QImage img4confidence)
 {
     struct timeval tv;
     long currTimeUsec;
@@ -828,6 +828,8 @@ bool MainWindow::new_frame_display(QImage image, QImage img4confidence)
             currTimeUsec = tv.tv_sec*1000000 + tv.tv_usec;
             streamed_timeUs = (currTimeUsec - firstDisplayFrameTimeUsec);
             displayed_fps = (displayedFrameCnt * 1000000) / streamed_timeUs;
+//            DBG_NOTICE("---------frm_sequence: %d, displayedFrameCnt: %d, streamed_timeUs:%d, currTimeUsec: %d (%lld), tv_sec: %d---\n",
+//                frm_sequence, displayedFrameCnt, streamed_timeUs, currTimeUsec, currTimeUsec, tv.tv_sec);
         }
     }
 
@@ -911,10 +913,5 @@ void MainWindow::captureAndSaveScreenshot()
     }
 }
 
-void MainWindow::onCtrl_S_Pressed(void)
-{
-    DBG_INFO("Ctrl + S was pressed.");
-    captureAndSaveScreenshot();
-}
 #endif
 

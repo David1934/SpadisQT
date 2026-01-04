@@ -16,8 +16,6 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <semaphore.h>
-//#include <QDebug>
-#include <QDateTime>
 
 #include "common.h"
 
@@ -62,7 +60,8 @@ public:
     Misc_Device();
     ~Misc_Device();
 
-    int read_dtof_runtime_status_param(float *temperature);
+    int read_dtof_runtime_status_param(struct adaps_dtof_runtime_status_param **status_param);
+    int get_dtof_inside_temperature(float *temperature);
     void* get_dtof_calib_eeprom_param(void);
     void* get_dtof_exposure_param(void);
     void* get_dtof_runtime_status_param(void);
@@ -85,6 +84,7 @@ private:
     int         fd_4_misc;
     swift_spot_module_eeprom_data_t *p_spot_module_eeprom;
     swift_flood_module_eeprom_data_t *p_flood_module_eeprom;
+    swift_eeprom_v2_data_t *p_bigfov_module_eeprom;
     struct adaps_dtof_module_static_data module_static_data;
     struct adaps_dtof_runtime_status_param last_runtime_status_param;
     struct adaps_dtof_exposure_param exposureParam;
@@ -97,7 +97,6 @@ private:
 
     int read_dtof_module_static_data(void);
     int check_crc32_4_flood_calib_eeprom_param(void);
-    bool save_dtof_calib_eeprom_param(void *buf, int len);
     bool check_crc8_4_eeprom_item(uint8_t *pEEPROMData, uint32_t offset, uint32_t length, uint8_t savedCRC, const char *tag);
     int check_crc8_4_spot_calib_eeprom_param(void);
     int get_next_line(const uint8_t *buffer, size_t buffer_len, size_t *pos, char *line, size_t line_len);
@@ -105,6 +104,7 @@ private:
     int parse_items(const uint32_t ulItemsCount, const ScriptItem *pstrItems);
     int write_external_config_script(external_config_script_param_t *param);
     int write_external_roisram_data_size(external_roisram_data_size_t *param);
+    int dump_eeprom_data(u8* pEEPROM_Data);
 
 };
 

@@ -156,17 +156,17 @@ int V4L2::init()
     return 0;
 }
 
-bool V4L2::get_power_on_state()
+bool V4L2::Get_power_on_state()
 {
     return power_on;
 }
 
-bool V4L2::get_stream_on_state()
+bool V4L2::Get_stream_on_state()
 {
     return stream_on;
 }
 
-int V4L2::get_videodev_fd()
+int V4L2::Get_videodev_fd()
 {
     return fd;
 }
@@ -401,7 +401,7 @@ int V4L2::V4l2_initilize(void)
         ret = get_subdev_node_4_sensor();
         if (ret < 0)
         {
-            DBG_ERROR("Fail to get subdev node for dtof sensor...");
+            DBG_ERROR("Fail to get subdev node for dtof sensor %s...", sensor_sd_name);
             return 0 - __LINE__;
         }
 
@@ -452,14 +452,6 @@ int V4L2::V4l2_initilize(void)
         return 0 - __LINE__;
     }
 
-    if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
-        buf_type                = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        DBG_INFO("Buffer type:\tV4L2_BUF_TYPE_VIDEO_CAPTURE");
-    } else if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE) {
-        buf_type                = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-        DBG_INFO("Buffer type:\tV4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE");
-    }
-
     // when config swift work mode, need TDC delay min/max need to know which environment, which measurement is used, so I move this the following lines before set sensor fmt;
 #if defined(RUN_ON_EMBEDDED_LINUX)
     if (SENSOR_TYPE_DTOF == snr_param.sensor_type)
@@ -487,7 +479,7 @@ int V4L2::V4l2_initilize(void)
             DBG_INFO("backuped_wkmode: %d, backuped_script_buf_sz: %d, backuped_roisram_data_sz: %d...\n", backuped_wkmode, backuped_script_buf_sz, backuped_roisram_data_sz);
 
             roi_sram_loaded = (backuped_roisram_data_sz > 0) ? true: false;
-            if (backuped_roisram_data_sz <= PER_ROISRAM_GROUP_SIZE)
+            if ((0 != backuped_roisram_data_sz) && (backuped_roisram_data_sz <= PER_ROISRAM_GROUP_SIZE))
             {
                 qApp->set_roi_sram_rolling(false);
             }
@@ -552,31 +544,67 @@ int V4L2::V4l2_initilize(void)
     DBG_INFO("VIDIOC_S_FMT %d X %d, pixel_format: 0x%x, raw_width:%d, raw_height:%d...\n",
     snr_param.raw_width, snr_param.raw_height, pixel_format, snr_param.raw_width, snr_param.raw_height);
     CLEAR(fmt);
-    fmt.type            = buf_type;
-    fmt.fmt.pix.pixelformat = pixel_format;
-    fmt.fmt.pix.width  = snr_param.raw_width;
-    fmt.fmt.pix.height   = snr_param.raw_height;
-    //fmt.fmt.pix.field   = V4L2_FIELD_INTERLACED;
-    //fmt.fmt.pix.quantization = V4L2_QUANTIZATION_FULL_RANGE;
 
-    if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1) {
-        DBG_ERROR("Fail to set format for dev: %s (%d), errno: %s (%d)...", video_dev, fd,
-            strerror(errno), errno);
-        return 0 - __LINE__;
+    if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
+        buf_type                = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        DBG_INFO("Buffer type:\tV4L2_BUF_TYPE_VIDEO_CAPTURE");
+
+        fmt.type            = buf_type;
+        fmt.fmt.pix.pixelformat = pixel_format;
+        fmt.fmt.pix.width  = snr_param.raw_width;
+        fmt.fmt.pix.height   = snr_param.raw_height;
+        //fmt.fmt.pix.field   = V4L2_FIELD_INTERLACED;
+        //fmt.fmt.pix.quantization = V4L2_QUANTIZATION_FULL_RANGE;
+
+        if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1) {
+            DBG_ERROR("Fail to set format for dev: %s (%d), errno: %s (%d)...", video_dev, fd,
+                strerror(errno), errno);
+            return 0 - __LINE__;
+        }
+
+        if (ioctl(fd, VIDIOC_G_FMT, &fmt) == -1) //重新读取 结构体，以确认完成设置
+        {
+            DBG_ERROR("Fail to get format , errno: %s (%d)...", 
+                strerror(errno), errno);
+            return 0 - __LINE__;
+        }
+        else {
+            DBG_INFO("fmt.type:\t%d", fmt.type);
+            DBG_INFO("pix.width:\t%d", fmt.fmt.pix.width);
+            DBG_INFO("pix.height:\t%d", fmt.fmt.pix.height);
+            DBG_INFO("pix.field:\t%d", fmt.fmt.pix.field);
+        }
+    } 
+    else if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE) {
+        buf_type                = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+        DBG_INFO("Buffer type:\tV4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE");
+
+        fmt.type            = buf_type;
+        fmt.fmt.pix_mp.pixelformat = pixel_format;
+        fmt.fmt.pix_mp.width  = snr_param.raw_width;
+        fmt.fmt.pix_mp.height   = snr_param.raw_height;
+        fmt.fmt.pix_mp.num_planes = 1;
+
+        if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1) {
+            DBG_ERROR("Fail to set format for dev: %s (%d), errno: %s (%d)...", video_dev, fd,
+                strerror(errno), errno);
+            return 0 - __LINE__;
+        }
+
+        if (ioctl(fd, VIDIOC_G_FMT, &fmt) == -1) //重新读取 结构体，以确认完成设置
+        {
+            DBG_ERROR("Fail to get format , errno: %s (%d)...", 
+                strerror(errno), errno);
+            return 0 - __LINE__;
+        }
+        else {
+            DBG_INFO("fmt.type:\t%d", fmt.type);
+            DBG_INFO("pix.width:\t%d", fmt.fmt.pix_mp.width);
+            DBG_INFO("pix.height:\t%d", fmt.fmt.pix_mp.height);
+            DBG_INFO("pix.field:\t%d", fmt.fmt.pix_mp.field);
+        }
     }
 
-    if (ioctl(fd, VIDIOC_G_FMT, &fmt) == -1) //重新读取 结构体，以确认完成设置
-    {
-        DBG_ERROR("Fail to get format , errno: %s (%d)...", 
-            strerror(errno), errno);
-        return 0 - __LINE__;
-    }
-    else {
-        DBG_INFO("fmt.type:\t%d", fmt.type);
-        DBG_INFO("pix.width:\t%d", fmt.fmt.pix.width);
-        DBG_INFO("pix.height:\t%d", fmt.fmt.pix.height);
-        DBG_INFO("pix.field:\t%d", fmt.fmt.pix.field);
-    }
 
     if (false == alloc_buffers())
     {
@@ -741,7 +769,7 @@ int V4L2::Capture_frame()
         return -1;
     }
 
-    p_runtime_status_param = (struct adaps_dtof_runtime_status_param *) p_misc_device->get_dtof_runtime_status_param();
+    p_misc_device->read_dtof_runtime_status_param(&p_runtime_status_param);
     param1.curr_temperature = p_runtime_status_param->inside_temperature_x100;
     param1.curr_exp_vop_abs = p_runtime_status_param->expected_vop_abs_x100;
     param1.curr_exp_pvdd = p_runtime_status_param->expected_pvdd_x100;
@@ -781,10 +809,23 @@ int V4L2::Capture_frame()
         param.frame_timestamp_us = timestamp_convert_from_timeval_to_us(v4l2_buf.timestamp);
         param.mipi_rx_fps = mipi_rx_fps;
 
-        host_comm->report_frame_raw_data(buffers[v4l2_buf.index].start, bytesused, &param);
+        host_comm->upload_frame_raw_data(buffers[v4l2_buf.index].start, bytesused, &param);
     }
 #endif
 #endif
+
+    if (true == Utils::is_env_var_true(ENV_VAR_BUFFER_FULLY_ZERO_CHECK))
+    {
+        int offset = 256; // For PTM mode, The first 256 bytes are always not full-zero, even some bugs happen.
+        if (WK_DTOF_PCM == snr_param.work_mode)
+        {
+           offset = 0;
+        }
+        if (true == utils->buffer_is_fully_same(static_cast<unsigned char*>(buffers[v4l2_buf.index].start) + offset, bytesused - offset, 0))
+        {
+            DBG_NOTICE("%s() frame[%d] buffer (offset:%d, length:%d) are fully zero!!!\n",  __FUNCTION__, v4l2_buf.sequence, offset, bytesused - offset);
+        }
+    }
 
     if ((true == Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_PROCESS))            // if skip frame proceess with the environment variable
 #if defined(CONSOLE_APP_WITHOUT_GUI)
@@ -796,6 +837,7 @@ int V4L2::Capture_frame()
         {
             DBG_NOTICE("%s() mipi_rx_fps = %d fps, rxFrameCnt: %ld\n",  __FUNCTION__, mipi_rx_fps, rxFrameCnt);
         }
+
     }
     else {
         emit update_info(param1);

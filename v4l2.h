@@ -74,9 +74,9 @@ public:
     void Stop_streaming(void);
     void V4l2_close(void);
     void Get_frame_size_4_curr_wkmode(int *in_width, int *in_height, int *out_width, int *out_height);
-    bool get_power_on_state();
-    bool get_stream_on_state();
-    int get_videodev_fd();
+    bool Get_power_on_state();
+    bool Get_stream_on_state();
+    int Get_videodev_fd();
 
 
 private:

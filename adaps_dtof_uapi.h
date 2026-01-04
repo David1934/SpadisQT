@@ -68,7 +68,7 @@ struct sys_perf_param {
 
 
 #if 1 //def __KERNEL__
-#if defined(CONFIG_VIDEO_ADS6311)  // FOR ADAPS_HAWK
+#if defined(CONFIG_VIDEO_ADS6311) || defined(CONFIG_VIDEO_ADS65XX) // FOR ADAPS_HAWK and CRANE
 
 #define SENSOR_OTP_DATA_SIZE    0x20 // unit is word (16-bits)
 
@@ -126,31 +126,31 @@ typedef enum hawk_soc_board_version {
     HAWK_SOC_BOARD_VER_TI_AM62A   = SOC_PLATFORM_TI_AM62A,  // 0x1001
 }hawk_soc_board_version_t;
 
-typedef enum hawk_chip_eco_version {
-    HAWK_CHIP_ECO_VER_UNKNOWN = 0,
-    HAWK_CHIP_ECO_VER_NTO,  // NewTapeOut
-    HAWK_CHIP_ECO_VER_ECO1,
-    HAWK_CHIP_ECO_VER_ECO2,
-    HAWK_CHIP_ECO_VER_ECO3,
-    HAWK_CHIP_ECO_VER_ECO4,
-    HAWK_CHIP_ECO_VER_ECO5,
-    HAWK_CHIP_ECO_VER_ECO6,
-    HAWK_CHIP_ECO_VER_ECO7,
-    HAWK_CHIP_ECO_VER_ECO8,
-}hawk_chip_eco_version_t;
+typedef enum sensor_chip_eco_version {
+    SENSOR_CHIP_ECO_VER_UNKNOWN = 0,
+    SENSOR_CHIP_ECO_VER_NTO,  // NewTapeOut
+    SENSOR_CHIP_ECO_VER_ECO1,
+    SENSOR_CHIP_ECO_VER_ECO2,
+    SENSOR_CHIP_ECO_VER_ECO3,
+    SENSOR_CHIP_ECO_VER_ECO4,
+    SENSOR_CHIP_ECO_VER_ECO5,
+    SENSOR_CHIP_ECO_VER_ECO6,
+    SENSOR_CHIP_ECO_VER_ECO7,
+    SENSOR_CHIP_ECO_VER_ECO8,
+}sensor_chip_eco_version_t;
 
-typedef enum hawk_lens_type {
-    HAWK_LENS_WIDEANGLE = 0,
-    HAWK_LENS_TELEPHOTO,
+typedef enum lens_type {
+    LENS_TYPE_WIDEANGLE = 0,
+    LENS_TYPE_TELEPHOTO,
 
-    HAWK_LENS_COUNT
-}hawk_lens_t;
+    LENS_TYPE_COUNT
+}lens_t;
 
-typedef enum hawk_vcsel_op_code {
-    HAWK_VCSEL_OP_UNININT = 0,
-    HAWK_VCSEL_OP_START = 1,
-    HAWK_VCSEL_OP_STOP = 2,
-}hawk_vcsel_op_code_t;
+typedef enum vcsel_drv_op_code {
+    VCSEL_DRV_OP_UNININT = 0,
+    VCSEL_DRV_OP_START = 1,
+    VCSEL_DRV_OP_STOP = 2,
+}vcsel_drv_op_code_t;
 
 enum hawk_rx_error_type_e {
     HAWK_RX_FSM_ALARM               = BIT(0),  // internal state-machine mismatch alarm
@@ -184,47 +184,47 @@ typedef enum hawk_pvdd_switch_strategy_e {
 } pvdd_swt_strategy_t;
 
 enum {
-    HAWK_OTP_TEMPERATURE_PARAM_LOW,
-    HAWK_OTP_TEMPERATURE_PARAM_ROOM,
-    HAWK_OTP_TEMPERATURE_PARAM_HIGH,
-    HAWK_OTP_TEMPERATURE_PARAM_COUNT,
+    SENSOR_OTP_TEMPERATURE_PARAM_LOW,
+    SENSOR_OTP_TEMPERATURE_PARAM_ROOM,
+    SENSOR_OTP_TEMPERATURE_PARAM_HIGH,
+    SENSOR_OTP_TEMPERATURE_PARAM_COUNT,
 };
 
-enum hawk_otp_checksum_state{
-    HAWK_OTP_CHECKSUM_UNSAVED,     // only for these BLANK chip without CP test
-    HAWK_OTP_CHECKSUM_MATCHED,
-    HAWK_OTP_CHECKSUM_MISMATCHED,
+enum sensor_otp_checksum_state{
+    SENSOR_OTP_CHECKSUM_UNSAVED,     // only for these BLANK chip without CP test
+    SENSOR_OTP_CHECKSUM_MATCHED,
+    SENSOR_OTP_CHECKSUM_MISMATCHED,
 };
 
-struct hawk_otp_temperature_param
+struct sensor_otp_temperature_param
 {
-    __u8 chksum_state;              // refer to the enum hawk_otp_checksum_state
+    __u8 chksum_state;              // refer to the enum sensor_otp_checksum_state
     __u16 vbe_code;
     __u16 vbr_voltage;              // value x10 mv
     __u8 temperature;               // low temperature use signed 8-bit integer, while room and high temperature use unsigned temperature
 }__attribute__ ((packed));
 
-struct hawk_otp_key_data
+struct sensor_otp_key_data
 {
     u16 chip_eco_version;
-    struct hawk_otp_temperature_param temperature_param[HAWK_OTP_TEMPERATURE_PARAM_COUNT];
+    struct sensor_otp_temperature_param temperature_param[SENSOR_OTP_TEMPERATURE_PARAM_COUNT];
 }__attribute__ ((packed));
 
-struct hawk_otp_ref_voltage
+struct sensor_otp_ref_voltage
 {
     bool otp_blank;
     bool otp_read;   // whether read the otp data or not?
     u16 adc_reference_voltage;      // unit is mV
 }__attribute__ ((packed));
 
-struct hawk_otp_raw_data
+struct sensor_otp_raw_data
 {
     bool otp_blank;
     bool otp_read;   // whether read the otp data or not?
     u16 raw_data[SENSOR_OTP_DATA_SIZE];
 }__attribute__ ((packed));
 
-struct hawk_norflash_op_param
+struct sensor_norflash_op_param
 {
     __u32 op_code; //0:read,1:write
     __u32 offset;
@@ -299,9 +299,9 @@ struct hawk_sensor_cfg_data
 #define ADTOF_GET_MCUHARDWARE_VERSION \
     _IOR('T', ADAPS_DTOF_PRIVATE + 21, __u16 *)             // 0x15
 
-//for hawk sensor norflash data
+//for sensor norflash data
 #define ADTOF_NORFLASH_OPERATION       \
-    _IOW('T', ADAPS_DTOF_PRIVATE + 22, struct hawk_norflash_op_param *)     // 0x16
+    _IOW('T', ADAPS_DTOF_PRIVATE + 22, struct sensor_norflash_op_param *)     // 0x16
 
 #define ADTOF_VCSEL_OPERATION       \
     _IOW('T', ADAPS_DTOF_PRIVATE + 23, __u32 *)             // 0x17
@@ -318,14 +318,14 @@ struct hawk_sensor_cfg_data
 #define ADTOF_GET_RX_TEMPERATURE      \
     _IOR('T', ADAPS_DTOF_PRIVATE + 27, __s16 *)             // 0x1B
 
-#define ADTOF_GET_HAWK_CHIP_ECO_VERSION      \
+#define ADTOF_GET_SENSOR_CHIP_ECO_VERSION      \
     _IOR('T', ADAPS_DTOF_PRIVATE + 28, __u16 *)             // 0x1C
 
-#define ADTOF_GET_HAWK_CHIP_ASC_ALARM      \
+#define ADTOF_GET_SENSOR_CHIP_ASC_ALARM      \
     _IOR('T', ADAPS_DTOF_PRIVATE + 29, __u32 *)             // 0x1D
 
-#define ADTOF_GET_HAWK_OTP_KEY_DATA       \
-    _IOR('T', ADAPS_DTOF_PRIVATE + 30, struct hawk_otp_key_data *)          // 0x1E
+#define ADTOF_GET_SENSOR_OTP_KEY_DATA       \
+    _IOR('T', ADAPS_DTOF_PRIVATE + 30, struct sensor_otp_key_data *)          // 0x1E
 
 #define ADTOF_SET_LENS_TYPE      \
     _IOW('T', ADAPS_DTOF_PRIVATE + 31, __u8 *)              // 0x1F
@@ -336,8 +336,8 @@ struct hawk_sensor_cfg_data
 #define ADTOF_GET_SOC_BOARD_VERSION      \
     _IOR('T', ADAPS_DTOF_PRIVATE + 33, __u16 *)             // 0x21
 
-#define ADTOF_GET_HAWK_OTP_REF_VOLTAGE       \
-    _IOR('T', ADAPS_DTOF_PRIVATE + 34, struct hawk_otp_ref_voltage *)          // 0x22
+#define ADTOF_GET_SENSOR_OTP_REF_VOLTAGE       \
+    _IOR('T', ADAPS_DTOF_PRIVATE + 34, struct sensor_otp_ref_voltage *)          // 0x22
 
 #define ADTOF_SET_MCU_ERR_REPORT_MASK      \
     _IOW('T', ADAPS_DTOF_PRIVATE + 35, __u16 *)             // 0x23
@@ -366,8 +366,8 @@ struct hawk_sensor_cfg_data
 #define ADTOF_SET_PVDD_SWITCH_STRATEGY      \
     _IOW('T', ADAPS_DTOF_PRIVATE + 43, __u8 *)              // 0x2B   see also pvdd_swt_strategy_t
 
-#define ADTOF_GET_HAWK_OTP_RAW_DATA       \
-    _IOR('T', ADAPS_DTOF_PRIVATE + 44, struct hawk_otp_raw_data *)          // 0x2C
+#define ADTOF_GET_SENSOR_OTP_RAW_DATA       \
+    _IOR('T', ADAPS_DTOF_PRIVATE + 44, struct sensor_otp_raw_data *)          // 0x2C
 
 #define ADTOF_SET_SENSOR_CFG_DATA       \
     _IOW('T', ADAPS_DTOF_PRIVATE + 45, struct hawk_sensor_cfg_data *)          // 0x2D
@@ -703,6 +703,104 @@ typedef struct SwiftFloodModuleEepromData
 #define FLOOD_ONE_SPOD_OFFSET_BYTE_SIZE                    3840//240*4*4
 
 // -------------------- swift FLOOD module definition end -------------
+#define BIG_FOV_EEPROM_DATA_STRUCT_VERSION                  0x20251229
+#define BIG_FOV_EEPROM_MAGIC                                0xEEAD6401
+
+#define BIG_FOV_MODULE_SN_LENGTH                            32
+#define BIG_FOV_MAX_SPOT_ZONE_COUNT                        36 // to code easily, use the MACRO replace X in the definition of swift_eeprom_v2_data_t
+#define BIG_FOV_MODULE_EEPROM_CAPACITY_SIZE                (128*1024)  // 128K, unit is bytes
+#define BIG_FOV_MODULE_EEPROM_PAGE_SIZE                    256
+
+
+#pragma pack(1)
+typedef struct SwiftEepromV2Data
+{
+    //HEAD
+    uint32_t        magic_id;                               // 数据结构头魔术字，固定为十六进制值0xEEAD6401，用于识别是否ads6401模组的eeprom数据
+    uint32_t        data_structure_version;                 // eeprom数据结构的版本，格式为最后修改的日期（十六进制值），比如0x20251208
+    uint8_t         calibrationInfo[32];                    // 标定工具软件的版本号信息
+    uint8_t         LastCalibratedTime[32];                 // 最后标定时间，比如：2025/11/27 14:59:04
+    uint8_t         serialNumber[BIG_FOV_MODULE_SN_LENGTH]; // 模组序列号
+    uint32_t        data_length;                            // HEAD后的所有DATA字段（BASIC_DATA + 压缩前BIG_DATA）的长度
+    uint32_t        data_crc32;                             // HEAD后的所有DATA字段（BASIC_DATA + 压缩前BIG_DATA）的CRC32值
+    uint32_t        compressed_data_length;                 // HEAD后的所有DATA字段（BASIC_DATA + 压缩后BIG_DATA）的长度
+    uint32_t        compressed_data_crc32;                  // HEAD后的所有DATA字段（BASIC_DATA + 压缩后BIG_DATA）的CRC32值
+
+    //BASIC_DATA
+    uint8_t         real_spot_zone_count;                   // X, 本模组实际有多少个spot zone (每个zone,最多有240个散点坐标)，必须是4的整数倍(4X)
+    uint8_t         tdcDelay[2];                            // Tdc delay Max and Min值，需用来写ads6401寄存器
+    uint8_t         lensType;                               // 
+    float           indoorCalibTemperature;                 // 室内标定温度，需要传给算法库
+    float           indoorCalibRefDistance;                 // 室内标定参考距离，需要传给算法库
+    float           outdoorCalibTemperature;                // 室外标定温度，需要传给算法库
+    float           outdoorCalibRefDistance;                // 室外标定参考距离，需要传给算法库
+    float           intrinsic[9];                           // dToF镜头的内参（9个参数）
+    float           rgb_intrinsic[8];                       // RGB镜头的内参（8个参数）
+    float           common_extrinsic[7];                    // RGB及dToF镜头的联合外参（7个参数）
+    uint8_t         Reserved[20];                           // 保留空间，为了凑整到256 bytes
+
+    //BIG_DATA, 标定工具写入eeprom前需要压缩，Linux驱动读出后立即解压缩，压缩操作对应用层是不可见的
+    uint8_t          sramData[PER_CALIB_SRAM_ZONE_SIZE * BIG_FOV_MAX_SPOT_ZONE_COUNT];
+    WalkErrorParam_t walkerrorData[PER_ZONE_MAX_SPOT_COUNT * BIG_FOV_MAX_SPOT_ZONE_COUNT];
+    float            spotOffset[PER_ZONE_MAX_SPOT_COUNT * BIG_FOV_MAX_SPOT_ZONE_COUNT];
+}swift_eeprom_v2_data_t;
+#pragma pack()
+
+#define  BIG_FOV_MODULE_EEPROM_CALIBRATIONINFO_OFFSET               OFFSET(swift_eeprom_v2_data_t, calibrationInfo)
+#define  BIG_FOV_MODULE_EEPROM_CALIBRATIONINFO_SIZE                 MEMBER_SIZE(swift_eeprom_v2_data_t, calibrationInfo)
+
+#define  BIG_FOV_MODULE_EEPROM_LASTCALIBRATEDTIME_OFFSET            OFFSET(swift_eeprom_v2_data_t, LastCalibratedTime)
+#define  BIG_FOV_MODULE_EEPROM_LASTCALIBRATEDTIME_SIZE              MEMBER_SIZE(swift_eeprom_v2_data_t, LastCalibratedTime)
+
+#define  BIG_FOV_MODULE_EEPROM_SERIALNUMBER_OFFSET                  OFFSET(swift_eeprom_v2_data_t, serialNumber)
+#define  BIG_FOV_MODULE_EEPROM_SERIALNUMBER_SIZE                    MEMBER_SIZE(swift_eeprom_v2_data_t, serialNumber)
+
+#define  BIG_FOV_MODULE_EEPROM_TDCDELAY_OFFSET                      OFFSET(swift_eeprom_v2_data_t, tdcDelay)
+#define  BIG_FOV_MODULE_EEPROM_TDCDELAY_SIZE                        MEMBER_SIZE(swift_eeprom_v2_data_t, tdcDelay)
+
+#define  BIG_FOV_MODULE_EEPROM_INDOOR_CALIBTEMPERATURE_OFFSET       OFFSET(swift_eeprom_v2_data_t, indoorCalibTemperature)
+#define  BIG_FOV_MODULE_EEPROM_INDOOR_CALIBTEMPERATURE_SIZE         MEMBER_SIZE(swift_eeprom_v2_data_t, indoorCalibTemperature)
+
+#define  BIG_FOV_MODULE_EEPROM_INDOOR_CALIBREFDISTANCE_OFFSET       OFFSET(swift_eeprom_v2_data_t, indoorCalibRefDistance)
+#define  BIG_FOV_MODULE_EEPROM_INDOOR_CALIBREFDISTANCE_SIZE         MEMBER_SIZE(swift_eeprom_v2_data_t, indoorCalibRefDistance)
+
+#define  BIG_FOV_MODULE_EEPROM_OUTDOOR_CALIBTEMPERATURE_OFFSET      OFFSET(swift_eeprom_v2_data_t, outdoorCalibTemperature)
+#define  BIG_FOV_MODULE_EEPROM_OUTDOOR_CALIBTEMPERATURE_SIZE        MEMBER_SIZE(swift_eeprom_v2_data_t, outdoorCalibTemperature)
+
+#define  BIG_FOV_MODULE_EEPROM_OUTDOOR_CALIBREFDISTANCE_OFFSET      OFFSET(swift_eeprom_v2_data_t, outdoorCalibRefDistance)
+#define  BIG_FOV_MODULE_EEPROM_OUTDOOR_CALIBREFDISTANCE_SIZE        MEMBER_SIZE(swift_eeprom_v2_data_t, outdoorCalibRefDistance)
+
+#define  BIG_FOV_MODULE_EEPROM_CALIBRATIONINFO_OFFSET               OFFSET(swift_eeprom_v2_data_t, calibrationInfo)
+#define  BIG_FOV_MODULE_EEPROM_CALIBRATIONINFO_SIZE                 MEMBER_SIZE(swift_eeprom_v2_data_t, calibrationInfo)
+
+#define  BIG_FOV_MODULE_EEPROM_INTRINSIC_OFFSET                     OFFSET(swift_eeprom_v2_data_t, intrinsic)
+#define  BIG_FOV_MODULE_EEPROM_INTRINSIC_SIZE                       MEMBER_SIZE(swift_eeprom_v2_data_t, intrinsic)         /// 9xsizeof(float)
+
+#define  BIG_FOV_MODULE_EEPROM_RGB_INTRINSIC_OFFSET                 OFFSET(swift_eeprom_v2_data_t, rgb_intrinsic)
+#define  BIG_FOV_MODULE_EEPROM_RGB_INTRINSIC_SIZE                   MEMBER_SIZE(swift_eeprom_v2_data_t, rgb_intrinsic)         /// 8xsizeof(float)
+
+#define  BIG_FOV_MODULE_EEPROM_COMMON_EXTRINSIC_OFFSET              OFFSET(swift_eeprom_v2_data_t, common_extrinsic)
+#define  BIG_FOV_MODULE_EEPROM_COMMON_EXTRINSIC_SIZE                MEMBER_SIZE(swift_eeprom_v2_data_t, common_extrinsic)         /// 7xsizeof(float)
+
+#define  BIG_FOV_MODULE_EEPROM_ROISRAM_DATA_OFFSET                  OFFSET(swift_eeprom_v2_data_t, sramData)
+#define  BIG_FOV_MODULE_EEPROM_ROISRAM_DATA_MAX_SIZE                MEMBER_SIZE(swift_eeprom_v2_data_t, sramData)
+
+#define  BIG_FOV_MODULE_EEPROM_WALK_ERROR_OFFSET                    OFFSET(swift_eeprom_v2_data_t, walkerrorData)
+#define  BIG_FOV_MODULE_EEPROM_WALK_ERROR_MAX_SIZE                  MEMBER_SIZE(swift_eeprom_v2_data_t, walkerrorData)
+
+#define  BIG_FOV_MODULE_EEPROM_SPOTOFFSET_OFFSET                    OFFSET(swift_eeprom_v2_data_t, spotOffset)
+#define  BIG_FOV_MODULE_EEPROM_SPOTOFFSET_MAX_SIZE                  MEMBER_SIZE(swift_eeprom_v2_data_t, spotOffset)
+
+// WARNING: This value should be an integer multiple of 4096 and greater than(>=) the EEPROM data size of all kinds of modules.
+#define MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA                    278528
+
+
+#define  BIG_FOV_MODULE_EEPROM_BASICDATA_OFFSET                     OFFSET(swift_eeprom_v2_data_t, real_spot_zone_count)
+#define  BIG_FOV_MODULE_EEPROM_BIGDATA_OFFSET                       BIG_FOV_MODULE_EEPROM_ROISRAM_DATA_OFFSET
+
+#define  BIG_FOV_MODULE_EEPROM_HEAD_SIZE                            BIG_FOV_MODULE_EEPROM_BASICDATA_OFFSET
+#define  BIG_FOV_MODULE_EEPROM_BASICDATA_SIZE                       (BIG_FOV_MODULE_EEPROM_BIGDATA_OFFSET - BIG_FOV_MODULE_EEPROM_BASICDATA_OFFSET)
+#define  BIG_FOV_MODULE_EEPROM_BIGDATA_MAX_SIZE                     (BIG_FOV_MODULE_EEPROM_ROISRAM_DATA_MAX_SIZE + BIG_FOV_MODULE_EEPROM_WALK_ERROR_MAX_SIZE + BIG_FOV_MODULE_EEPROM_SPOTOFFSET_MAX_SIZE)
 
 struct adaps_dtof_intial_param {
     AdapsEnvironmentType env_type;
@@ -748,7 +846,7 @@ struct adaps_dtof_runtime_status_param {
 };
 
 struct adaps_dtof_module_static_data{
-    __u32 module_type;            // refer to ADS6401_MODULE_SPOT/ADS6401_MODULE_FLOOD/... of adaps_types.h file
+    __u32 module_type;            // refer to ADS6401_MODULE_SPOT/ADS6401_MODULE_SMALL_FLOOD/... of adaps_types.h file
     __u32 eeprom_capacity;       // unit is byte
     __u16 otp_vbe25;
     __u16 otp_vbd;        // unit is 10mv, or the related V X 100
@@ -760,7 +858,7 @@ struct adaps_dtof_module_static_data{
 };
 
 struct adaps_dtof_update_eeprom_data{
-    __u32 module_type;            // refer to ADS6401_MODULE_SPOT/ADS6401_MODULE_FLOOD/... of adaps_types.h file
+    __u32 module_type;            // refer to ADS6401_MODULE_SPOT/ADS6401_MODULE_SMALL_FLOOD/... of adaps_types.h file
     __u32 eeprom_capacity;       // unit is byte
     __u32 offset;             //eeprom data start offset
     __u32 length;                //eeprom data length

@@ -71,6 +71,8 @@ public:
     UINT32 get_size_4_loaded_roisram();
     int set_size_4_loaded_roisram(UINT32 bytes);
 
+    UINT8 get_module_kernel_type();
+    int set_module_kernel_type(UINT8 value);
     UINT8* get_loaded_walkerror_data();
     int set_loaded_walkerror_data(UINT8* value);
     UINT32 get_loaded_walkerror_data_size();
@@ -111,9 +113,9 @@ private:
     AdapsEnvironmentType selected_e_type;
     AdapsFramerateType selected_framerate_type;
     AdapsPowerMode selected_power_mode;
-    bool            capture_req_from_host;
-    bool            roi_sram_rolling;
-    bool            walkerror_enable;
+    bool capture_req_from_host;
+    bool roi_sram_rolling;
+    bool walkerror_enable;
     int GrayScaleMinMappedRange;
     int GrayScaleMaxMappedRange;
     float RealDistanceMinMappedRange;
@@ -124,7 +126,7 @@ private:
     UINT32 loaded_spotoffset_data_size;
     UINT8 *mmap_address_4_loaded_roisram;
     UINT32 size_4_loaded_roisram;
-    Misc_Device     *misc_dev_instance;
+    Misc_Device *misc_dev_instance;
     UINT8 anchor_rowOffset;
     UINT8 anchor_colOffset;
     UINT8 rowSearchingRange;
@@ -133,6 +135,7 @@ private:
     UINT8 usrCfgCoarseExposure;
     UINT8 usrCfgFineExposure;
     UINT8 usrCfgLaserExposurePeriod;
+    UINT8 module_kernel_type = 0;
 
     AdapsMeasurementType string_2_measurementtype(QString& str);
     AdapsEnvironmentType string_2_environmenttype(QString& str);

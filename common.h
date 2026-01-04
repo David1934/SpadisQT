@@ -6,18 +6,14 @@
 #include "adaps_types.h"
 #include "adaps_dtof_uapi.h"
 
-#if defined(RUN_ON_EMBEDDED_LINUX)
-#define MAX_CALIB_SRAM_DATA_GROUP_CNT           9
-
-#endif
-
 #define VERSION_MAJOR                           3
-#define VERSION_MINOR                           2
-#define VERSION_REVISION                        20
-#define LAST_MODIFIED_TIME                      "202500920A"
+#define VERSION_MINOR                           5
+#define VERSION_REVISION                        3
+#define LAST_MODIFIED_TIME                      "20260104A"
 
 #define DEFAULT_DTOF_FRAMERATE                  AdapsFramerateType30FPS // AdapsFramerateType60FPS
 
+#define DEPTH_LIB_DATA_DUMP_PATH                "./OfflineData/"
 #define DEPTH_LIB_CONFIG_PATH                   "/vendor/etc/camera/adapsdepthsettings.xml"
 #define DATA_SAVE_PATH                          "/tmp/" // "/sdcard/"
 #define DEFAULT_SAVE_FRAME_CNT                  0
@@ -52,6 +48,7 @@
 #define FRAME_INTERVAL_4_PROGRESS_REPORT        500   // every X frames, report a progress
 
 #define WAIT_TIME_4_THREAD_EXIT                 10  // unit is  milliseconds
+#define POLL_TIMEOUT                            100  // unit is  milliseconds
 
 #if defined(RUN_ON_EMBEDDED_LINUX)
     #define DEFAULT_SENSOR_TYPE                 SENSOR_TYPE_DTOF
@@ -61,6 +58,7 @@
     #define SPOT_MODULE_TYPE_NAME               "Spot"
     #define FLOOD_MODULE_TYPE_NAME              "Flood"
     #define BIG_FOV_FLOOD_MODULE_TYPE_NAME      "Big_FoV_Flood"
+    #define BIG_FOV_FLOOD_V2_MODULE_TYPE_NAME   "Big_FoV_Flood_V2"
 #else
     #define DEFAULT_SENSOR_TYPE                 SENSOR_TYPE_RGB
 #endif
@@ -71,7 +69,9 @@
 #define DEBUG_PRO
 #define ENV_VAR_SAVE_EEPROM_ENABLE              "save_eeprom_enable"
 #define ENV_VAR_SAVE_DEPTH_TXT_ENABLE           "save_depth_txt_enable"
-#define ENV_VAR_SAVE_FRAME_ENABLE               "save_frame_enable"
+#define ENV_VAR_SAVE_FRAME_RAW_DATA_ENABLE      "save_frame_raw_data_enable"
+#define ENV_VAR_SAVE_FRAME_DEPTH16_ENABLE       "save_frame_depth16_enable"
+#define ENV_VAR_SAVE_FRAME_POINTCLOUD_ENABLE    "save_frame_pointcloud_enable"
 #define ENV_VAR_SKIP_FRAME_DECODE               "skip_frame_decode"
 #define ENV_VAR_SKIP_FRAME_PROCESS              "skip_frame_process"
 #define ENV_VAR_SKIP_EEPROM_CRC_CHK             "skip_eeprom_crc_check"
@@ -82,12 +82,12 @@
 #define ENV_VAR_DISABLE_WALK_ERROR              "disable_walk_error"      // processed in adaps decode algo lib
 #define ENV_VAR_EXPECTED_FRAME_MD5SUM           "expected_frame_md5sum"
 #define ENV_VAR_DEVELOP_DEBUGGING               "develop_debugging"
-#define ENV_VAR_TEST_PATTERN_TYPE               "test_pattern_type"
 #define ENV_VAR_ROI_SRAM_COORDINATES_CHECK      "roi_sram_coordinates_check"
 #define ENV_VAR_RAW_FILE_REPLAY_ENABLE          "raw_file_replay_enable"
 #define ENV_VAR_DEPTH16_FILE_REPLAY_ENABLE      "depth16_file_replay_enable"
 #define ENV_VAR_FRAME_DROP_CHECK_ENABLE         "frame_drop_check_enable"
 #define ENV_VAR_SAVE_LOADED_DATA_ENABLE         "save_loaded_data_enable"
+#define ENV_VAR_BUFFER_FULLY_ZERO_CHECK         "buffer_fully_zero_check"
 
 #define ENV_VAR_FORCE_ROW_SEARCH_RANGE          "force_row_search_range"
 #define ENV_VAR_FORCE_COLUMN_SEARCH_RANGE       "force_column_search_range"
@@ -95,6 +95,7 @@
 #define ENV_VAR_FORCE_FINE_EXPOSURE             "force_fineExposure"
 #define ENV_VAR_FORCE_GRAY_EXPOSURE             "force_grayExposure"
 #define ENV_VAR_FORCE_LASEREXPOSUREPERIOD       "force_laserExposurePeriod"
+#define ENV_VAR_FORCE_FRAMERATE_FPS             "force_framerate_fps"
 #define ENV_VAR_FORCE_ROI_SRAM_SIZE             "force_roi_sram_size"
 
 #define ENV_VAR_DBGINFO_ENABLE                  "debug_info_enable"
@@ -105,7 +106,6 @@
 #define ENV_VAR_DUMP_ROI_SRAM_SIZE              "dump_roi_sram_size"
 #define ENV_VAR_DUMP_DEPTH_MAP_FRAME_ITVL       "dump_depth_map_frame_interval"
 #define ENV_VAR_DUMP_COMM_BUFFER_SIZE           "dump_comm_buf_size"
-#define ENV_VAR_DUMP_ALGO_LIB_IO_PARAM          "dump_algo_lib_io_param"
 #define ENV_VAR_DUMP_CAPTURE_REQ_PARAM          "dump_capture_req_param"
 #define ENV_VAR_DUMP_FRAME_PARAM_TIMES          "dump_frame_param_times"
 #define ENV_VAR_DUMP_MID_CONF_ENABLE            "dump_medium_confidence_spot"
@@ -117,6 +117,8 @@
 #define ENV_VAR_DUMP_WALKERROR_PARAM_COUNT      "dump_walkerror_param_count"
 #define ENV_VAR_DUMP_OFFSETDATA_PARAM_COUNT     "dump_offsetdata_param_count"
 #define ENV_VAR_DUMP_CALIB_REFERENCE_DISTANCE   "dump_calib_reference_distance"
+#define ENV_VAR_DUMP_EEPROM_DATA                "dump_eeprom_data"
+#define ENV_VAR_ENABLE_ALGO_LIB_DUMP_DATA       "enable_algo_lib_dump_data"
 
 #define __tostr(x)                          #x
 #define __stringify(x)                      __tostr(x)
@@ -216,20 +218,12 @@ inline bool env_var_is_true(const char *var_name)
 #define DBG_INFO        printf
 #endif
 
-#define errno_debug(fmt)            DBG_ERROR("%s error %d, %s\n", (fmt), errno, strerror(errno))
-
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef signed short s16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
-
-enum moduletype{
-    MODULE_TYPE_UNINITIALIZED = 0x0,
-    MODULE_TYPE_SPOT = ADS6401_MODULE_SPOT,
-    MODULE_TYPE_FLOOD = ADS6401_MODULE_FLOOD,
-    MODULE_TYPE_BIG_FOV_FLOOD = ADS6401_MODULE_BIG_FOV_FLOOD
-};
+typedef unsigned int moduletype;
 
 enum stop_request_code{
     STOP_REQUEST_RGB,
@@ -254,6 +248,7 @@ enum frame_data_type{
     FDATA_TYPE_DTOF_RAW_DEPTH,
     FDATA_TYPE_DTOF_DECODED_GRAYSCALE,
     FDATA_TYPE_DTOF_DECODED_DEPTH16,
+    FDATA_TYPE_DTOF_DECODED_POINT_CLOUD,
     FDATA_TYPE_COUNT
 };
 
@@ -271,7 +266,7 @@ struct sensor_params
 {
     enum sensortype sensor_type;
     enum sensor_workmode work_mode;
-    int         save_frame_cnt;
+    uint32_t    to_dump_frame_cnt;
     int         raw_width;
     int         raw_height;
     int         out_frm_width;
@@ -289,6 +284,7 @@ struct sensor_params
 
 struct status_params1
 {
+    unsigned int frm_sequence;
     int mipi_rx_fps;
     unsigned long streamed_time_us;
 #if defined(RUN_ON_EMBEDDED_LINUX)
@@ -300,6 +296,7 @@ struct status_params1
 
 struct status_params2
 {
+    unsigned int frm_sequence;
     int mipi_rx_fps;
     unsigned long streamed_time_us;
     unsigned int sensor_type;

@@ -37,10 +37,13 @@ typedef int64_t             INT64;
 #define ADS6401_MODULE_SPOT                 0x6401A
 
 // built-in EEPROM P24C256F-D4H-MIR, VcselDriver PhotonIC 5015, MCU HC32L110B6YA, 
-#define ADS6401_MODULE_FLOOD                0x6401B
+#define ADS6401_MODULE_SMALL_FLOOD          0x6401B
 
-// built-in EEPROM P24C512X-C4H-MIR, VcselDriver OPN7020
+// built-in EEPROM XXXX, VcselDriver OPN7020
 #define ADS6401_MODULE_BIG_FOV_FLOOD        0x6401C
+
+// built-in EEPROM XXXX, VcselDriver yyyy
+#define ADS6401_MODULE_BIG_FOV_FLOOD_V2     0x6401D
 
 typedef struct ADAPS_MIRROR_FRAME_SET
 {

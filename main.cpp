@@ -12,6 +12,8 @@
 #include "mainwindow.h"
 #include "globalapplication.h"
 
+#define DEPTH_LIB_SO_PATH                   "/vendor/lib64/libadaps_swift_decode.so"
+
 static MainWindow* mainWindow = nullptr;
 
 static void dump_stack()
@@ -80,6 +82,42 @@ static void getScreenResolution()
 }
 #endif
 
+int requirement_check()
+{
+    int ret = 0;
+    Utils *utils;
+    utils = new Utils();
+
+    ret = utils->check_regular_file_exist(DEPTH_LIB_SO_PATH);
+    if (ret < 0)
+    {
+        DBG_ERROR("Adaps algo lib <%s> does not exist, please check it!\n", DEPTH_LIB_SO_PATH);
+        goto error_exit;
+    }
+
+    ret = utils->check_regular_file_exist(DEPTH_LIB_CONFIG_PATH);
+    if (ret < 0)
+    {
+        DBG_ERROR("Adaps algo lib config file <%s> does not exist, please check it!\n", DEPTH_LIB_CONFIG_PATH);
+        goto error_exit;
+    }
+
+    if (true == Utils::is_env_var_true(ENV_VAR_ENABLE_ALGO_LIB_DUMP_DATA))
+    {
+        ret = utils->check_dir_exist_and_writable(DEPTH_LIB_DATA_DUMP_PATH);
+        if (ret < 0)
+        {
+            DBG_ERROR("dump directory <%s> does not exist or not writable, please check it!\n", DEPTH_LIB_DATA_DUMP_PATH);
+            goto error_exit;
+        }
+    }
+
+error_exit:
+    delete utils;
+
+    return ret;
+}
+
 int main(int argc, char *argv[])
 {
     int result;
@@ -102,6 +140,10 @@ int main(int argc, char *argv[])
 
         return 1;
     }
+
+    result =requirement_check();
+    if (result < 0)
+        return result;
 
     MainWindow w;
     mainWindow = &w;

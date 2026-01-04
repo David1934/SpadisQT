@@ -94,6 +94,7 @@ public:
 
 private:
     Misc_Device *p_misc_device;
+
     struct sensor_params m_sns_param;
     uint64_t m_exposure_time;
     int32_t  m_sensitivity;
@@ -118,6 +119,8 @@ private:
     void* loaded_roi_sram_data;
     uint8_t* copied_roisram_4_anchorX;
     uint32_t loaded_roi_sram_size;
+    int sub_frame_cnt_per_image_frame;
+    volatile bool skip_frame_decode;
 
     u8 frameCoordinatesMap[OUTPUT_HEIGHT_4_DTOF_SENSOR][OUTPUT_WIDTH_4_DTOF_SENSOR];
 
@@ -127,7 +130,6 @@ private:
     void PrepareFrameParam(WrapperDepthCamConfig *wrapper_depth_map_config);
     u8 normalizeGreyscale(u16 range);
     void Distance_2_BGRColor(int bucketNum, float bucketSize, u16 distance, struct BGRColor *destColor);
-    int hexdump_param(void* param_ptr, int param_size, const char *param_name, int callline);
     int roiCoordinatesDumpCheck(uint8_t* roi_sram_data, int outImgWidth, int outImgHeight, int roisram_group_index);
     int multipleRoiCoordinatesDumpCheck(uint8_t* multiple_roi_sram_data, u16 length, int outImgWidth, int outImgHeight);
     void init_frame_checker(FrameLossChecker *checker);

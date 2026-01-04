@@ -41,14 +41,13 @@ protected:
 private slots:
 
     #if !defined(CONSOLE_APP_WITHOUT_GUI)
-        bool new_frame_display(QImage image, QImage img4confidence);
+        bool new_frame_display(unsigned int frm_sequence, QImage image, QImage img4confidence);
         bool update_status_info(status_params2 param2);
 
         void updateRTCtime(void);
         void on_startStopButton_clicked();
         void simulateButtonClick();
         void onCtrl_X_Pressed(void);
-        void onCtrl_S_Pressed(void);
     #endif
     void Quit(void);
     void onThreadEnd(int stop_request_code);

@@ -20,8 +20,6 @@
 	<MultiPeakMinbinThreshold>10</MultiPeakMinbinThreshold>
 	<!-- time bin interval : 125, 250 or 500 -->
 	<TimeBinInterval>250</TimeBinInterval>
-	<!-- Module Type 0:Spots module, 1:array module -->
-	<ModuleType>1</ModuleType>
 	<!-- FrameAccumulateCount -->
 	<FrameAccumulateCount>1</FrameAccumulateCount>
 </Algorithm>

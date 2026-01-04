@@ -24,10 +24,11 @@ public:
     Host_Communication& operator=(const Host_Communication&) = delete;
     ~Host_Communication();
 
-    int report_frame_raw_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
-    int report_frame_depth16_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
-    int report_frame_pointcloud_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
-    int report_req_histogram_data(void* pHistDataPtr, uint32_t spotHistDataSize, frame_buffer_param_t *pFrmBufParam);
+    int upload_frame_raw_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
+    int upload_frame_depth16_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
+    int upload_frame_pointcloud_data(void* pFrameData, uint32_t frameData_size, frame_buffer_param_t *pFrmBufParam);
+    int upload_req_histogram_data(void* pHistDataPtr, uint32_t spotHistDataSize, frame_buffer_param_t *pFrmBufParam);
+
     void get_backuped_external_config_script(UINT8 *workmode, UINT8 ** script_buffer, uint32_t *script_buffer_size);
     int report_status(UINT16 responsed_cmd, UINT16 status_code, char *msg, int msg_length);
     UINT8 get_req_out_data_type();
@@ -60,11 +61,11 @@ private:
     UINT8 backuped_wkmode;
     capture_req_param_t backuped_capture_req_param;
     UINT32 loaded_walkerror_data_size;
-    UINT8 *loaded_walkerror_data = NULL_POINTER;     // roisram_data backuped from CMD_HOST_SIDE_SET_SPOT_WALKERROR_DATA
+    UINT8 *loaded_walkerror_data = NULL_POINTER;     // roisram_data backuped from CMD_HOST_SIDE_DOWNLOAD_SPOT_WALKERROR_DATA
     UINT32 loaded_spotoffset_data_size;
     UINT8 *loaded_spotoffset_data = NULL_POINTER;
-    float *loaded_ref_distance_data = NULL_POINTER;     // roisram_data backuped from CMD_HOST_SIDE_SET_REF_DISTANCE_DATA
-    float *loaded_lens_intrinsic_data = NULL_POINTER;     // roisram_data backuped from CMD_HOST_SIDE_SET_LENS_INTRINSIC_DATA
+    float *loaded_ref_distance_data = NULL_POINTER;     // roisram_data backuped from CMD_HOST_SIDE_DOWNLOAD_REF_DISTANCE_DATA
+    float *loaded_lens_intrinsic_data = NULL_POINTER;     // roisram_data backuped from CMD_HOST_SIDE_DOWNLOAD_LENS_INTRINSIC_DATA
     UINT32 eeprom_capacity;       // unit is byte
     Misc_Device *p_misc_device;
 
@@ -85,21 +86,24 @@ private:
     void reset_data();
     static int adaps_sender_callback(SenderEventId_t id, void* arg_ptr, uint32_t arg_u32, ...);
 
+    int upload_module_static_data();
+
+    void download_roisram_data(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void download_walkerror_data(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void download_spotoffset_data(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void download_ref_distance_data(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void download_lens_intrinsic_data(CommandData_t* pCmdData, uint32_t rxDataLen);
+
     void adaps_start_capture(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_set_colormap_range(CommandData_t* pCmdData, uint32_t rxDataLen);
     void read_device_register(UINT16 cmdType, CommandData_t* pCmdData, uint32_t rxDataLen);
     void write_device_register(UINT16 cmdType, CommandData_t* pCmdData, uint32_t rxDataLen);
-    int report_module_static_data();
-    void adaps_load_roi_sram(CommandData_t* pCmdData, uint32_t rxDataLen);
-    void adaps_load_walkerror_data(CommandData_t* pCmdData, uint32_t rxDataLen);
-    void adaps_load_spotoffset_data(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_set_walkerror_enable(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_update_eeprom_data(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_request_device_reboot(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_set_rtc_time(CommandData_t* pCmdData, uint32_t rxDataLen);
-    void adaps_load_ref_distance_data(CommandData_t* pCmdData, uint32_t rxDataLen);
-    void adaps_load_lens_intrinsic_data(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_set_req_histogram_position(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void adaps_set_module_kernel_type(CommandData_t* pCmdData, uint32_t rxDataLen);
 
     void adaps_event_process(void* pRXData, uint32_t rxDataLen);
     void adaps_sender_disconnected(void);

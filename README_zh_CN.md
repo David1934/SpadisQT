@@ -7,13 +7,15 @@
 
 已在 RK3568（Linux 5.10 内核）平台上完成测试。
 
-该应用需使用 QT 5.x 在 Linux 环境下编译。（注意：由于使用了 V4L2 API，无法在 Windows 运行。）
+该应用需使用 QT 5.x 在 Linux 环境下编译。（注意：由于使用了Linux V4L2 API，所以无法在 Windows 运行。）
 
 在构建和运行 SpadisQT 前，请确保开发板支持 QT 环境，此类基础问题请自行研究，我们无法逐一解答。
 
-ADS6401 芯片支持两种 dToF 模块：  
-- **SPOT 模块**  
-- **FLOOD 模块**  
+ADS6401 芯片支持四种 dToF 模块：  
+- **散点模块**
+- **小面阵模块**
+- **大FoV面阵模块**
+- **大FoV V2面阵模块**
 
 当执行 `ADAPS_GET_DTOF_MODULE_STATIC_DATA` ioctl 命令时，Linux 内核驱动（`ads6401`）会返回当前模块类型。
 

@@ -14,6 +14,7 @@
 #include <linux/reboot.h>
 #include <sys/reboot.h>
 #include <unistd.h>  // 引入 getuid() 函数的声明
+#include <QDateTime>
 
 
 #include "common.h"
@@ -48,13 +49,18 @@ public:
     void test_pattern_generate(unsigned char *write_buf, int len, int ptn_idx);
     void hexdump(const unsigned char * buf, int buf_len, const char * title);
     bool save_binary_file(const char *filename, const void *buffer, size_t size, const char *call_func, unsigned int call_line);
+    void save_depth_txt_file(void *frm_buf,unsigned int frm_sequence,int frm_len, int w, int h);
+    bool save_dtof_eeprom_calib_data_2_file(void *buf, int len);
     void nv12_2_rgb(unsigned char *nv12, unsigned char *rgb, int width, int height);
     void yuyv_2_rgb(unsigned char *yuyv, unsigned char *rgb, int width, int height);
-    bool IsASCII(const unsigned char c);
     void GetRgb4watchPoint(const u8 rgb_buffer[], const int out_frm_width, u8 x, u8 y, u8 *r, u8 *g, u8 *b);
     void GetPidTid(const char *callfunc, const int callline);
     int MD5Check4Buffer(const unsigned char* buffer, int size, const char *expected_md5_string, const char *call_func, int call_line);
     int MD5Calculate(const unsigned char* buffer, int size, const char *call_func, unsigned int call_line);
+    bool buffer_is_fully_same(const unsigned char *buffer, int len, unsigned char val);
+    int check_dir_exist_and_writable(const char *dir_path);
+    int check_file_exist(const char *file_path);
+    int check_regular_file_exist(const char *file_path);
 
     static int system_reboot()
     {
@@ -107,6 +113,7 @@ private:
     QString replay_file_path;
     int currentIndex;
     uint32_t m_crc32_table[256];
+    bool IsASCII(const unsigned char c);
     void generate_crc32_table();
     void loadFiles(const QString &directoryPath, const QString &fileExtension);
     unsigned char hexCharToValue(char c);

@@ -19,10 +19,11 @@ FrameProcessThread::FrameProcessThread()
 #endif
 
     outputed_frame_cnt = 0;
+    dumped_frame_cnt = 0;
     v4l2 = NULL_POINTER;
     utils = NULL_POINTER;
     sns_param.sensor_type = qApp->get_sensor_type();
-    sns_param.save_frame_cnt = qApp->get_save_cnt();
+    sns_param.to_dump_frame_cnt = qApp->get_save_cnt();
     skip_frame_decode = Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_DECODE);
     dump_spot_statistics_times = Utils::get_env_var_intvalue(ENV_VAR_DUMP_SPOT_STATISTICS_TIMES);
     dump_ptm_frame_headinfo_times = Utils::get_env_var_intvalue(ENV_VAR_DUMP_PTM_FRAME_HEADINFO_TIMES);
@@ -71,6 +72,18 @@ FrameProcessThread::FrameProcessThread()
 
 FrameProcessThread::~FrameProcessThread()
 {
+    if (NULL_POINTER != adaps_dtof)
+    {
+        delete adaps_dtof;
+        adaps_dtof = NULL_POINTER;
+    }
+
+    if (NULL_POINTER != v4l2)
+    {
+        delete v4l2;
+        v4l2 = NULL_POINTER;
+    }
+
     if (NULL_POINTER != utils)
     {
         delete utils;
@@ -92,12 +105,6 @@ FrameProcessThread::~FrameProcessThread()
     }
 #endif
 
-    if (NULL_POINTER != adaps_dtof)
-    {
-        delete adaps_dtof;
-        adaps_dtof = NULL_POINTER;
-    }
-
     if (NULL_POINTER != confidence_map_buffer)
     {
         free(confidence_map_buffer);
@@ -110,45 +117,6 @@ FrameProcessThread::~FrameProcessThread()
         free(rgb_buffer);
         rgb_buffer = NULL_POINTER;
     }
-
-    if (NULL_POINTER != v4l2)
-    {
-        delete v4l2;
-        v4l2 = NULL_POINTER;
-    }
-}
-
-void FrameProcessThread::save_depth_txt_file(void *frm_buf,unsigned int frm_sequence,int frm_len)
-{
-    Q_UNUSED(frm_sequence);
-    QDateTime       localTime = QDateTime::currentDateTime();
-    QString         currentTime = localTime.toString("yyyyMMddhhmmss");
-    char *          LocalTimeStr = (char *) currentTime.toStdString().c_str();
-
-    char path[50]={0};
-    int16_t *p_temp=(int16_t*)frm_buf;
-
-    sprintf(path,"%sframe%03d_%s_%d_depth16%s",DATA_SAVE_PATH,frm_sequence, LocalTimeStr, frm_len, ".txt");
-    FILE*fp = NULL_POINTER;
-    fp=fopen(path, "w+");
-    if (fp == NULL_POINTER)
-    {
-        DBG_ERROR("fopen output file %s failed!\n",  path);
-        return;
-    }
-    for (int i = 0; i < OUTPUT_HEIGHT_4_DTOF_SENSOR; i++)
-    {
-        int offset = i * OUTPUT_WIDTH_4_DTOF_SENSOR;
-        for (int j = 0; j < OUTPUT_WIDTH_4_DTOF_SENSOR; j++)
-        {
-            fprintf(fp, "%6u ", (*(p_temp + offset + j))&0x1fff);  //do not printf high 3 bit confidence
-        }
-        fprintf(fp, "\n");
-    }
-    fflush(fp);
-    fclose(fp);
-    DBG_INFO("Save depth file %s success!\n",  path);
-
 }
 
 bool FrameProcessThread::save_frame(unsigned int frm_sequence, void *frm_buf, int buf_size, int frm_w, int frm_h, struct timeval frm_timestamp, enum frame_data_type ftype)
@@ -160,7 +128,8 @@ bool FrameProcessThread::save_frame(unsigned int frm_sequence, void *frm_buf, in
                                     ".raw_grayscale",
                                     ".raw_depth",
                                     ".decoded_grayscale",
-                                    ".decoded_depth16"
+                                    ".decoded_depth16",
+                                    ".decoded_point_cloud"
                                 };
 
     Q_UNUSED(frm_timestamp);
@@ -186,6 +155,7 @@ bool FrameProcessThread::info_update(status_params1 param1)
     status_params2 param2;
 
     param2.sensor_type = sns_param.sensor_type;
+    param2.frm_sequence = param1.frm_sequence;
     param2.mipi_rx_fps = param1.mipi_rx_fps;
     param2.streamed_time_us = param1.streamed_time_us;
     param2.work_mode = sns_param.work_mode;
@@ -232,9 +202,9 @@ bool FrameProcessThread::new_frame_handle(
             {
                 run_times++;
 
-                if (sns_param.save_frame_cnt > 0)
+                if ((sns_param.to_dump_frame_cnt > 0) && (dumped_frame_cnt < sns_param.to_dump_frame_cnt))
                 {
-                    if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_ENABLE))
+                    if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_RAW_DATA_ENABLE))
                     {
                         save_frame(frm_sequence,frm_rawdata,buf_len,
                             sns_param.raw_width, sns_param.raw_height,
@@ -242,38 +212,39 @@ bool FrameProcessThread::new_frame_handle(
                     }
                 }
 
-                if (skip_frame_decode)
+                decodeRet = adaps_dtof->dtof_frame_decode(frm_sequence, (unsigned char *)frm_rawdata, buf_len, depth_buffer, NULL_POINTER, sns_param.work_mode);
+                if (0 == decodeRet)
                 {
-                    int i;
-                    decodeRet = 0;
-
-                    for (i = 0; i < sns_param.out_frm_width*sns_param.out_frm_height; i++)
-                    {
-                        rgb_buffer[i*3] = 0x0;     // R component, fill with min value 0x0
-                        rgb_buffer[i*3 + 1] = 0x0;  // G component, fill with min value 0x00
-                        rgb_buffer[i*3 + 2] = 0xFF;  // B component, fill with max value 0xFF
-                    }
-                }
-                else {
-                    decodeRet = adaps_dtof->dtof_frame_decode(frm_sequence, (unsigned char *)frm_rawdata, buf_len, depth_buffer, NULL_POINTER, sns_param.work_mode);
-                    if (0 == decodeRet)
-                    {
 #if !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
-                        Host_Communication *host_comm = Host_Communication::getInstance();
-                        if (host_comm)
-                        {
-                            frmBufParam.data_type = FRAME_DECODED_DEPTH16;
-                            frmBufParam.frm_width = sns_param.out_frm_width;
-                            frmBufParam.frm_height = sns_param.out_frm_height;
-                            frmBufParam.padding_bytes_per_line = 0;
+                    Host_Communication *host_comm = Host_Communication::getInstance();
+                    if (host_comm)
+                    {
+                        frmBufParam.data_type = FRAME_DECODED_DEPTH16;
+                        frmBufParam.frm_width = sns_param.out_frm_width;
+                        frmBufParam.frm_height = sns_param.out_frm_height;
+                        frmBufParam.padding_bytes_per_line = 0;
 
-                            host_comm->report_frame_depth16_data(depth_buffer, depth_buffer_size, &frmBufParam);
-                        }
+                        host_comm->upload_frame_depth16_data(depth_buffer, depth_buffer_size, &frmBufParam);
+                    }
 #endif
 
-                        if (sns_param.save_frame_cnt > 0)
+                    if (skip_frame_decode)
+                    {
+                        int i;
+                        decodeRet = 0;
+
+                        memset(depth_buffer, 0xFF, depth_buffer_size); // set to VERY-FAR to display a special pure color for host's SpadisApp
+                        for (i = 0; i < sns_param.out_frm_width*sns_param.out_frm_height; i++)
                         {
-                            if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_ENABLE))
+                            rgb_buffer[i*3] = 0xFF;     // R component, fill with max value 0xFF
+                            rgb_buffer[i*3 + 1] = 0x0;  // G component, fill with min value 0x00
+                            rgb_buffer[i*3 + 2] = 0x0;  // B component, fill with min value 0x00
+                        }
+                    }
+                    else {
+                        if ((sns_param.to_dump_frame_cnt > 0) && (dumped_frame_cnt < sns_param.to_dump_frame_cnt))
+                        {
+                            if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_DEPTH16_ENABLE))
                             {
                                 save_frame(frm_sequence,depth_buffer,depth_buffer_size,
                                     sns_param.out_frm_width, sns_param.out_frm_height,
@@ -282,20 +253,12 @@ bool FrameProcessThread::new_frame_handle(
                         }
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
                         adaps_dtof->ConvertGreyscaleToColoredMap(depth_buffer,rgb_buffer, sns_param.out_frm_width,sns_param.out_frm_height);
-                        if (sns_param.save_frame_cnt > 0)
-                        {
-                            if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_ENABLE))
-                            {
-                                save_frame(frm_sequence,rgb_buffer,sns_param.out_frm_width*sns_param.out_frm_height*RGB_IMAGE_CHANEL,
-                                    sns_param.out_frm_width, sns_param.out_frm_height,
-                                    frm_timestamp, FDATA_TYPE_RGB888);
-                            }
-                        }
 #endif
                     }
-                    else {
-                        DBG_ERROR("dtof_frame_decode() return %d , save_frame_cnt: %d...", decodeRet, sns_param.save_frame_cnt);
-                    }
+
+                }
+                else {
+                    DBG_ERROR("dtof_frame_decode() return %d , to_dump_frame_cnt: %d...", decodeRet, sns_param.to_dump_frame_cnt);
                 }
             }
             break;
@@ -326,9 +289,9 @@ bool FrameProcessThread::new_frame_handle(
                         );
                 }
 
-                if (sns_param.save_frame_cnt > 0)
+                if ((sns_param.to_dump_frame_cnt > 0) && (dumped_frame_cnt < sns_param.to_dump_frame_cnt))
                 {
-                    if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_ENABLE))
+                    if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_RAW_DATA_ENABLE))
                     {
 #if 0
                         save_frame(frm_sequence,frm_rawdata,buf_len,
@@ -345,37 +308,38 @@ bool FrameProcessThread::new_frame_handle(
                     }
                 }
 
-                if (skip_frame_decode)
-                {
-                    int i;
-                    decodeRet = 0;
-
-                    for (i = 0; i < sns_param.out_frm_width*sns_param.out_frm_height; i++)
-                    {
-                        rgb_buffer[i*3] = 0xFF;     // R component, fill with max value 0xFF
-                        rgb_buffer[i*3 + 1] = 0x0;  // G component, fill with min value 0x00
-                        rgb_buffer[i*3 + 2] = 0x0;  // B component, fill with min value 0x00
-                    }
-                }
-                else {
-                    decodeRet = adaps_dtof->dtof_frame_decode(
-                        frm_sequence,
-                        (unsigned char *)frm_rawdata,
-                        buf_len,
-                        depth_buffer,
+                decodeRet = adaps_dtof->dtof_frame_decode(
+                    frm_sequence,
+                    (unsigned char *)frm_rawdata,
+                    buf_len,
+                    depth_buffer,
 #if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6) && defined(ENABLE_POINTCLOUD_OUTPUT)
-                        out_pcloud_buffer,
+                    out_pcloud_buffer,
 #else
-                        NULL_POINTER,
+                    NULL_POINTER,
 #endif
-                        sns_param.work_mode);
+                    sns_param.work_mode);
 
-                    if (0 == decodeRet)
-                    {
+                if (0 == decodeRet)
+                {
 #if !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
-                        Host_Communication *host_comm = Host_Communication::getInstance();
+                    Host_Communication *host_comm = Host_Communication::getInstance();
 #endif
 
+                    if (skip_frame_decode)
+                    {
+                        int i;
+                        decodeRet = 0;
+
+                        memset(depth_buffer, 0xFF, depth_buffer_size); // set to VERY-FAR to display a special pure color for host's SpadisApp
+                        for (i = 0; i < sns_param.out_frm_width*sns_param.out_frm_height; i++)
+                        {
+                            rgb_buffer[i*3] = 0xFF;     // R component, fill with max value 0xFF
+                            rgb_buffer[i*3 + 1] = 0x0;  // G component, fill with min value 0x00
+                            rgb_buffer[i*3 + 2] = 0x0;  // B component, fill with min value 0x00
+                        }
+                    }
+                    else {
                         outputed_frame_cnt++;
                         if (Utils::is_env_var_true(ENV_VAR_DEPTH16_FILE_REPLAY_ENABLE))
                         {
@@ -400,70 +364,72 @@ bool FrameProcessThread::new_frame_handle(
                         }
                         adaps_dtof->depthMapDump(depth_buffer, sns_param.out_frm_width, sns_param.out_frm_height, outputed_frame_cnt, __LINE__);
 
-#if !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
-                        if (host_comm)
+
+                        if ((sns_param.to_dump_frame_cnt > 0) && (dumped_frame_cnt < sns_param.to_dump_frame_cnt))
                         {
-                            uint16_t req_histogram_x = 0;
-                            uint16_t req_histogram_y = 0;
-
-                            frmBufParam.data_type = FRAME_DECODED_DEPTH16;
-                            frmBufParam.frm_width = sns_param.out_frm_width;
-                            frmBufParam.frm_height = sns_param.out_frm_height;
-                            frmBufParam.padding_bytes_per_line = 0;
-
-                            host_comm->report_frame_depth16_data(depth_buffer, depth_buffer_size, &frmBufParam);
-
-    #if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6) && defined(ENABLE_POINTCLOUD_OUTPUT)
-                            frmBufParam.data_type = FRAME_DECODED_POINT_CLOUD;
-                            host_comm->report_frame_pointcloud_data(out_pcloud_buffer, out_pcloud_buffer_size, &frmBufParam);
-    #endif
-
-                            req_histogram_x = host_comm->get_req_histogram_x();
-                            req_histogram_y = host_comm->get_req_histogram_y();
-
-                            if (0 != (req_histogram_x + req_histogram_y)) // We don't report histogram data for position(0,0)
-                            {
-                                SpotPoint* spotPoint = adaps_dtof->get_spcific_histogram(req_histogram_x, req_histogram_y);
-
-                                if (NULL_POINTER != spotPoint) {
-                                    frmBufParam.data_type = SPECIFIED_POS_HISTOGRAM;
-                                    host_comm->report_req_histogram_data((void* ) spotPoint, sizeof(struct SpotPoint), &frmBufParam);
-                                }
-                            }
-                        }
-#endif
-
-                        if (sns_param.save_frame_cnt > 0)
-                        {
-                            if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_ENABLE))
+                            if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_DEPTH16_ENABLE))
                             {
                                 save_frame(frm_sequence, depth_buffer, depth_buffer_size,
                                     sns_param.out_frm_width, sns_param.out_frm_height,
                                     frm_timestamp, FDATA_TYPE_DTOF_DECODED_DEPTH16);
                             }
+    
+#if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6) && defined(ENABLE_POINTCLOUD_OUTPUT)
+                            if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_POINTCLOUD_ENABLE))
+                            {
+                                save_frame(frm_sequence, out_pcloud_buffer, out_pcloud_buffer_size,
+                                    sns_param.out_frm_width, sns_param.out_frm_height,
+                                    frm_timestamp, FDATA_TYPE_DTOF_DECODED_POINT_CLOUD);
+                            }
+#endif
 
                             if (Utils::is_env_var_true(ENV_VAR_SAVE_DEPTH_TXT_ENABLE))
                             {
-                                save_depth_txt_file(depth_buffer, frm_sequence, sns_param.out_frm_width*sns_param.out_frm_height*sizeof(u16));
+                                utils->save_depth_txt_file(depth_buffer, frm_sequence, depth_buffer_size, sns_param.out_frm_width, sns_param.out_frm_height);
                             }
                         }
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
                         adaps_dtof->ConvertDepthToColoredMap(depth_buffer, rgb_buffer, confidence_map_buffer, sns_param.out_frm_width, sns_param.out_frm_height);
-                        if (sns_param.save_frame_cnt > 0)
-                        {
-                            if (true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_ENABLE))
-                            {
-                                save_frame(frm_sequence,rgb_buffer,sns_param.out_frm_width*sns_param.out_frm_height*RGB_IMAGE_CHANEL,
-                                    sns_param.out_frm_width, sns_param.out_frm_height,
-                                    frm_timestamp, FDATA_TYPE_RGB888);
-                            }
-                        }
 #endif
                     }
-                    else {
-                        //DBG_ERROR("dtof_frame_decode() return %d , frm_sequence: %d, adaps_dtof: %p...", decodeRet, frm_sequence, adaps_dtof);
+
+#if !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
+                    if (host_comm)
+                    {
+                        uint16_t req_histogram_x = 0;
+                        uint16_t req_histogram_y = 0;
+
+                        frmBufParam.data_type = FRAME_DECODED_DEPTH16;
+                        frmBufParam.frm_width = sns_param.out_frm_width;
+                        frmBufParam.frm_height = sns_param.out_frm_height;
+                        frmBufParam.padding_bytes_per_line = 0;
+
+                        host_comm->upload_frame_depth16_data(depth_buffer, depth_buffer_size, &frmBufParam);
+
+#if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6) && defined(ENABLE_POINTCLOUD_OUTPUT)
+                        frmBufParam.data_type = FRAME_DECODED_POINT_CLOUD;
+                        host_comm->upload_frame_pointcloud_data(out_pcloud_buffer, out_pcloud_buffer_size, &frmBufParam);
+#endif
+
+                        req_histogram_x = host_comm->get_req_histogram_x();
+                        req_histogram_y = host_comm->get_req_histogram_y();
+
+                        if (0 != (req_histogram_x + req_histogram_y)) // We don't report histogram data for position(0,0)
+                        {
+                            SpotPoint* spotPoint = adaps_dtof->get_spcific_histogram(req_histogram_x, req_histogram_y);
+
+                            if (NULL_POINTER != spotPoint) {
+                                frmBufParam.data_type = SPECIFIED_POS_HISTOGRAM;
+                                host_comm->upload_req_histogram_data((void* ) spotPoint, sizeof(struct SpotPoint), &frmBufParam);
+                            }
+                        }
                     }
+#endif
                 }
+                else {
+                    //DBG_ERROR("dtof_frame_decode() return %d , frm_sequence: %d, adaps_dtof: %p...", decodeRet, frm_sequence, adaps_dtof);
+                }
+
             }
             else {
                 DBG_ERROR("adaps_dtof is NULL");
@@ -505,18 +471,18 @@ bool FrameProcessThread::new_frame_handle(
         {
     #if defined(RUN_ON_EMBEDDED_LINUX)
             QImage img4confidence = QImage(confidence_map_buffer, sns_param.out_frm_width, sns_param.out_frm_height, sns_param.out_frm_width*RGB_IMAGE_CHANEL,QImage::Format_RGB888);
-            emit newFrameReady4Display(img, img4confidence);
+            emit newFrameReady4Display(frm_sequence, img, img4confidence);
     #endif
         }
         else {
             QImage img4confidence;
-            emit newFrameReady4Display(img, img4confidence);
+            emit newFrameReady4Display(frm_sequence, img, img4confidence);
         }
 #endif
     }
-    if (sns_param.save_frame_cnt > 0)
+    if (sns_param.to_dump_frame_cnt > 0)
     {
-        sns_param.save_frame_cnt--;
+        dumped_frame_cnt++;
     }
 
     return true;
@@ -651,7 +617,7 @@ void FrameProcessThread::run()
 {
     int ret = 0;
     /// static int run_times = 0;
-    int fd = v4l2->get_videodev_fd();
+    int fd = v4l2->Get_videodev_fd();
 
     // 使用poll监听设备fd，设置100ms超时，避免ioctl无限阻塞
      struct pollfd fds[1];
@@ -669,7 +635,7 @@ void FrameProcessThread::run()
                 ///     utils->GetPidTid(__FUNCTION__, __LINE__);
                 /// }
 
-                 ret = poll(fds, 1, 100); // 超时100ms
+                 ret = poll(fds, 1, POLL_TIMEOUT); // 超时100ms
                  if (ret <= 0) {
                      if (ret < 0)
                      {
@@ -695,7 +661,7 @@ void FrameProcessThread::run()
                              stopped = true;
                          }
                          else {
-                             if ((0 != qApp->get_save_cnt()) && (0 == sns_param.save_frame_cnt)) // if already capture expected frames, try to quit.
+                             if ((0 != sns_param.to_dump_frame_cnt) && (dumped_frame_cnt >= sns_param.to_dump_frame_cnt)) // if already capture expected frames, try to quit.
                              {
                                  stop(STOP_REQUEST_STOP);
                                  //break;
