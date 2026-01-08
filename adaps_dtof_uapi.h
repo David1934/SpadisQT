@@ -380,8 +380,6 @@ struct hawk_sensor_cfg_data
 
 #include "adaps_types.h"
 
-#define MAX_CALIB_SRAM_ROTATION_GROUP_CNT   9
-
 #define FW_VERSION_LENGTH                   12
 
 // There are two group Calibration SRAM for spod address, every group has 4 calibration registers.
@@ -393,9 +391,8 @@ struct hawk_sensor_cfg_data
 
 #define PER_CALIB_SRAM_ZONE_SIZE            512     //unit is bytes, actual use size is 480 bytes, the remaining 32 bytes is 0
 #define ZONE_COUNT_PER_SRAM_GROUP           4
-#define CALIB_SRAM_GROUP_COUNT              2
+#define CALIB_SRAM_GROUP_COUNT              2       // swift has 2 ROI SRAM registers, which are 0xFB and 0xF7
 
-#define ROI_SRAM_BUF_MAX_SIZE               (2*1024)   // 2x1024, unit is bytes
 #define REG_SETTING_BUF_MAX_SIZE_PER_SEG    2048       // unit is bytes, there may be 2 segments
 
 #define PER_ROISRAM_GROUP_SIZE              (PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP) //unit is bytes
@@ -576,7 +573,7 @@ typedef struct SwiftSpotModuleEepromData
 
 // -------------------- swift SPOT module definition end -------------
 
-// -------------------- swift FLOOD module definition start -------------
+// -------------------- swift SMALL_FLOOD module definition start -------------
 
 // EEPROM-I2C--P24C256F-D4H-MIR
 #define FLOOD_MODULE_EEPROM_CAPACITY_SIZE                   (32*1024)  // 32*1024, unit is bytes
@@ -702,14 +699,20 @@ typedef struct SwiftFloodModuleEepromData
 
 #define FLOOD_ONE_SPOD_OFFSET_BYTE_SIZE                    3840//240*4*4
 
-// -------------------- swift FLOOD module definition end -------------
+// -------------------- swift SMALL_FLOOD module definition end -------------
+
+// -------------------- swift BIG_FOV FLOOD module definition start -------------
+
+
+#define MAX_CALIB_SRAM_ROLLING_GROUP_CNT                    9
+
 #define BIG_FOV_EEPROM_DATA_STRUCT_VERSION                  0x20251229
 #define BIG_FOV_EEPROM_MAGIC                                0xEEAD6401
 
 #define BIG_FOV_MODULE_SN_LENGTH                            32
-#define BIG_FOV_MAX_SPOT_ZONE_COUNT                        36 // to code easily, use the MACRO replace X in the definition of swift_eeprom_v2_data_t
-#define BIG_FOV_MODULE_EEPROM_CAPACITY_SIZE                (128*1024)  // 128K, unit is bytes
-#define BIG_FOV_MODULE_EEPROM_PAGE_SIZE                    256
+#define BIG_FOV_MAX_SPOT_ZONE_COUNT                         (ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROLLING_GROUP_CNT) // 36
+#define BIG_FOV_MODULE_EEPROM_CAPACITY_SIZE                 (128*1024)  // 128K, unit is bytes
+#define BIG_FOV_MODULE_EEPROM_PAGE_SIZE                     256
 
 
 #pragma pack(1)
@@ -801,6 +804,8 @@ typedef struct SwiftEepromV2Data
 #define  BIG_FOV_MODULE_EEPROM_HEAD_SIZE                            BIG_FOV_MODULE_EEPROM_BASICDATA_OFFSET
 #define  BIG_FOV_MODULE_EEPROM_BASICDATA_SIZE                       (BIG_FOV_MODULE_EEPROM_BIGDATA_OFFSET - BIG_FOV_MODULE_EEPROM_BASICDATA_OFFSET)
 #define  BIG_FOV_MODULE_EEPROM_BIGDATA_MAX_SIZE                     (BIG_FOV_MODULE_EEPROM_ROISRAM_DATA_MAX_SIZE + BIG_FOV_MODULE_EEPROM_WALK_ERROR_MAX_SIZE + BIG_FOV_MODULE_EEPROM_SPOTOFFSET_MAX_SIZE)
+
+// -------------------- swift BIG_FOV FLOOD module definition end -------------
 
 struct adaps_dtof_intial_param {
     AdapsEnvironmentType env_type;

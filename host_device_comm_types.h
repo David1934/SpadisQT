@@ -7,7 +7,7 @@
 #define ERROR_MSG_MAX_LENGTH                    128
 #define PER_ROI_SRAM_MAX_SIZE                   512     //unit is bytes, actual use size is 480 bytes, the remaining 32 bytes is 0
 #define ZONE_COUNT_PER_SRAM_GROUP               4
-#define MAX_CALIB_SRAM_ROTATION_GROUP_CNT       9
+//#define MAX_CALIB_SRAM_ROLLING_GROUP_CNT        9
 #define SWIFT_PRODUCT_ID_SIZE                   12
 #define FW_VERSION_LENGTH                       12
 
@@ -192,7 +192,7 @@ typedef struct walkerror_enable_param
 typedef struct roisram_data_param
 {
     UINT32                  roisram_data_size;      // roi sram buffer size to be loaded, it should be an integer multiple of (PER_ROI_SRAM_MAX_SIZE * ZONE_COUNT_PER_SRAM_GROUP) or 0, 
-                                                    // it shoud <= (PER_ROI_SRAM_MAX_SIZE * ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROTATION_GROUP_CNT) 
+                                                    // it shoud <= (PER_ROI_SRAM_MAX_SIZE * ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROLLING_GROUP_CNT) 
     CHAR                    roisram_data[0];        // loaded roi sram buffer, No this member if roisram_data_size == 0
 } roisram_data_param_t;
 

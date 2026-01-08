@@ -257,9 +257,6 @@ bool FrameProcessThread::new_frame_handle(
                     }
 
                 }
-                else {
-                    DBG_ERROR("dtof_frame_decode() return %d , to_dump_frame_cnt: %d...", decodeRet, sns_param.to_dump_frame_cnt);
-                }
             }
             break;
 
@@ -426,10 +423,6 @@ bool FrameProcessThread::new_frame_handle(
                     }
 #endif
                 }
-                else {
-                    //DBG_ERROR("dtof_frame_decode() return %d , frm_sequence: %d, adaps_dtof: %p...", decodeRet, frm_sequence, adaps_dtof);
-                }
-
             }
             else {
                 DBG_ERROR("adaps_dtof is NULL");

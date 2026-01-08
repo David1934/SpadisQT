@@ -3,7 +3,7 @@
 
 #define ALGO_LIB_VERSION_MAJOR                           3
 #define ALGO_LIB_VERSION_MINOR                           7
-#define ALGO_LIB_VERSION_REVISION                        5
+#define ALGO_LIB_VERSION_REVISION                        7
 
 #define VERSION_HEX_VALUE(major, minor, revision)        (major << 16 | minor << 8 | revision)
 

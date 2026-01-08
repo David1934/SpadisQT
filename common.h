@@ -7,9 +7,9 @@
 #include "adaps_dtof_uapi.h"
 
 #define VERSION_MAJOR                           3
-#define VERSION_MINOR                           5
-#define VERSION_REVISION                        3
-#define LAST_MODIFIED_TIME                      "20260104A"
+#define VERSION_MINOR                           6
+#define VERSION_REVISION                        0
+#define LAST_MODIFIED_TIME                      "20260106A"
 
 #define DEFAULT_DTOF_FRAMERATE                  AdapsFramerateType30FPS // AdapsFramerateType60FPS
 
@@ -74,7 +74,6 @@
 #define ENV_VAR_SAVE_FRAME_POINTCLOUD_ENABLE    "save_frame_pointcloud_enable"
 #define ENV_VAR_SKIP_FRAME_DECODE               "skip_frame_decode"
 #define ENV_VAR_SKIP_FRAME_PROCESS              "skip_frame_process"
-#define ENV_VAR_SKIP_EEPROM_CRC_CHK             "skip_eeprom_crc_check"
 #define ENV_VAR_ENABLE_EXPAND_PIXEL             "enable_expand_pixel"      // processed in adaps decode algo lib
 #define ENV_VAR_DISABLE_COMPOSE_SUBFRAME        "disable_compose_subframe"  // processed in adaps decode algo lib
 #define ENV_VAR_MIRROR_X_ENABLE                 "mirror_x_enable"

@@ -5,119 +5,10 @@
 #include "host_device_comm_types.h"
 #include "globalapplication.h"
 
-#define CLEAR(x)                            memset(&(x), 0, sizeof(x))
-
 #define REG_NULL                            0xFF
 #define REG16_NULL                          0xFFFF
 
 #define errno_debug(fmt)                    DBG_ERROR("%s error %d, %s\n", (fmt), errno, strerror(errno))
-
-inline void EepromGetSwiftDeviceNumAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_VERSION_INFO_OFFSET;
-    *length = ADS6401_EEPROM_VERSION_INFO_SIZE;
-}
-
-inline void EepromGetSwiftSramDataAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_ROISRAM_DATA_OFFSET;
-    *length = ADS6401_EEPROM_ROISRAM_DATA_SIZE;
-}
-
-inline void EepromGetSwiftIntrinsicAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_INTRINSIC_OFFSET;
-    *length = ADS6401_EEPROM_INTRINSIC_SIZE;
-}
-
-/*
-inline void EepromGetSwiftSpotPosAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_ACCURATESPODPOS_OFFSET; //OFFSET(swift_eeprom_data_t, spotPos);
-    *length = ADS6401_EEPROM_ACCURATESPODPOS_SIZE; //MEMBER_SIZE(swift_eeprom_data_t, spotPos);
-}
-*/
-
-inline void EepromGetSwiftOutDoorOffsetAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_ACCURATESPODPOS_OFFSET; //OFFSET(swift_eeprom_data_t, spotPos);
-    *length = ADS6401_EEPROM_ACCURATESPODPOS_SIZE / 2; //MEMBER_SIZE(swift_eeprom_data_t, spotPos) / 2;
-}
-
-inline void EepromGetSwiftSpotOffsetbAddress(uint32_t* offset, uint32_t* length) {
-    // *offset = OFFSET(swift_eeprom_data_t, spotPos) + SPOT_MODULE_OFFSET_SIZE * sizeof(float);
-    *offset = ADS6401_EEPROM_ACCURATESPODPOS_OFFSET + SPOT_MODULE_OFFSET_SIZE * sizeof(float);
-    *length = ADS6401_EEPROM_ACCURATESPODPOS_SIZE / 2; //MEMBER_SIZE(swift_eeprom_data_t, spotPos) / 2;
-}
-
-inline void EepromGetSwiftSpotOffsetaAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_SPOTOFFSET_OFFSET;
-    *length = ADS6401_EEPROM_SPOTOFFSET_SIZE;
-}
-
-inline void EepromGetSwiftSpotOffsetAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_SPOTOFFSET_OFFSET;
-    *length = ADS6401_EEPROM_SPOTOFFSET_SIZE;
-}
-
-inline void EepromGetSwiftTdcDelayAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_TDCDELAY_OFFSET;
-    *length = ADS6401_EEPROM_TDCDELAY_SIZE;
-}
-
-inline void EepromGetSwiftRefDistanceAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_INDOOR_CALIBTEMPERATURE_OFFSET;
-    *length = ADS6401_EEPROM_INDOOR_CALIBTEMPERATURE_SIZE
-        + ADS6401_EEPROM_INDOOR_CALIBREFDISTANCE_SIZE
-        + ADS6401_EEPROM_OUTDOOR_CALIBTEMPERATURE_SIZE
-        + ADS6401_EEPROM_OUTDOOR_CALIBREFDISTANCE_SIZE
-        + ADS6401_EEPROM_CALIBRATIONINFO_SIZE;
-}
-
-inline void EepromGetSwiftCalibInfoAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_INDOOR_CALIBTEMPERATURE_OFFSET;
-    *length = ADS6401_EEPROM_INDOOR_CALIBTEMPERATURE_SIZE
-        + ADS6401_EEPROM_INDOOR_CALIBREFDISTANCE_SIZE
-        + ADS6401_EEPROM_OUTDOOR_CALIBTEMPERATURE_SIZE
-        + ADS6401_EEPROM_OUTDOOR_CALIBREFDISTANCE_SIZE;
-}
-
-inline void EepromGetSwiftPxyAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_PROX_HISTOGRAM_OFFSET;
-    *length = ADS6401_EEPROM_PROX_HISTOGRAM_SIZE
-        + ADS6401_EEPROM_PROX_DEPTH_SIZE
-        + ADS6401_EEPROM_PROX_NO_OF_PULSE_SIZE;
-}
-
-inline void EepromGetSwiftMarkedPixelAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_MARKED_PIXELS_OFFSET;
-    *length = ADS6401_EEPROM_MARKED_PIXELS_SIZE;
-}
-
-inline void EepromGetSwiftModuleInfoAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_MODULE_INFO_OFFSET;
-    *length = ADS6401_EEPROM_MODULE_INFO_SIZE;
-}
-
-inline void EepromGetSwiftWalkErrorAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_WALK_ERROR_OFFSET;
-    *length = ADS6401_EEPROM_WALK_ERROR_SIZE;
-}
-
-inline void EepromGetSwiftSpotEnergyAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_SPOT_ENERGY_OFFSET;
-    *length = ADS6401_EEPROM_SPOT_ENERGY_SIZE;
-}
-
-inline void EepromGetSwiftRawDepthAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_RAW_DEPTH_MEAN_OFFSET;
-    *length = ADS6401_EEPROM_RAW_DEPTH_MEAN_SIZE;
-}
-
-inline void EepromGetSwiftNoiseAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_NOISE_OFFSET;
-    *length = ADS6401_EEPROM_NOISE_SIZE;
-}
-
-inline void EepromGetSwiftChecksumAddress(uint32_t* offset, uint32_t* length) {
-    *offset = ADS6401_EEPROM_CHKSUM_OFFSET;
-    *length = ADS6401_EEPROM_CHKSUM_SIZE;
-}
 
 Misc_Device::Misc_Device()
 {
@@ -134,7 +25,7 @@ Misc_Device::Misc_Device()
     mmap_buffer_max_size = MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
         + REG_SETTING_BUF_MAX_SIZE_PER_SEG
-        + (PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROTATION_GROUP_CNT);
+        + (PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROLLING_GROUP_CNT);
     memset((void *) &last_runtime_status_param, 0, sizeof(struct adaps_dtof_runtime_status_param));
     fd_4_misc = 0;
     memset(devnode_4_misc, 0, DEV_NODE_LEN);
@@ -158,7 +49,7 @@ Misc_Device::Misc_Device()
         }
         mapped_eeprom_data_buffer = (u8* ) mmap_buffer_base;
         mapped_script_sensor_settings = (u8*)(mapped_eeprom_data_buffer + MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA);
-        mapped_script_vcsel_settings = (u8* ) (mapped_script_sensor_settings + ROI_SRAM_BUF_MAX_SIZE);
+        mapped_script_vcsel_settings = (u8* ) (mapped_script_sensor_settings + REG_SETTING_BUF_MAX_SIZE_PER_SEG);
         mapped_roi_sram_data = mapped_script_vcsel_settings + REG_SETTING_BUF_MAX_SIZE_PER_SEG;
         qApp->set_mmap_address_4_loaded_roisram(mapped_roi_sram_data);
 
@@ -174,6 +65,8 @@ Misc_Device::Misc_Device()
 
 Misc_Device::~Misc_Device()
 {
+    DBG_NOTICE("------------fd_4_misc: %d---\n", fd_4_misc);
+
     if (NULL_POINTER != mmap_buffer_base)
     {
         if (munmap(mmap_buffer_base, mmap_buffer_max_size)) {
@@ -659,278 +552,87 @@ void* Misc_Device::get_dtof_calib_eeprom_param(void)
 
 }
 
-bool Misc_Device::check_crc8_4_eeprom_item(uint8_t *pEEPROMData, uint32_t offset, uint32_t length, uint8_t savedCRC, const char *tag)
-{
-    bool ret = true;
-    unsigned char computedCRC = 0;
-    pEEPROMData += offset;
-
-    Utils *utils = new Utils();
-    computedCRC = utils->CRC8Calculate(pEEPROMData, length);
-    delete utils;
-
-    if (computedCRC != savedCRC) {
-        DBG_ERROR("crc8 MISMATCHED for eeprom[%s] at offset:%d, lenth: %d, saved crc8: 0x%02x, calc crc8: 0x%02x", tag, offset, length, savedCRC, computedCRC);
-        ret = false;
-    }
-    else {
-        //DBG_INFO("crc8 matched for eeprom[%s] at offset:%d, lenth: %d, saved crc8: 0x%02x, calc crc8: 0x%02x", tag, offset, length, savedCRC, computedCRC);
-        ret = true;
-    }
-
-    return ret;
-}
-
-int Misc_Device::check_crc8_4_spot_calib_eeprom_param(void)
-{
-    int ret = 0;
-    uint32_t offset;
-    uint32_t length;
-    uint8_t checkSum[SPOT_MODULE_CHECKSUM_SIZE] = { 0 };
-    uint8_t *pEEPROMData = (uint8_t *) p_spot_module_eeprom;
-    int eeprom_data_size = sizeof(swift_spot_module_eeprom_data_t);
-
-    EepromGetSwiftChecksumAddress(&offset, &length);
-    memcpy(checkSum, pEEPROMData + offset, length);
-
-    // checksum1 - calibrationInfo
-    EepromGetSwiftDeviceNumAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[CALIBRATION_INFO], "1.CALIBRATION_INFO")) {
-        DBG_ERROR("1.Checksum calibrationInfo (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum2 - sramData
-    EepromGetSwiftSramDataAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[SRAM_DATA], "2.SRAM_DATA")) {
-        DBG_ERROR("2.Checksum sramdata (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum3 - intrinsic
-    EepromGetSwiftIntrinsicAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[INTRINSIC], "3.INTRINSIC")) {
-        DBG_ERROR("3.Checksum intrinsic (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum4 - outdoor offset
-    EepromGetSwiftOutDoorOffsetAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[OUTDOOR_OFFSET], "4.OUTDOOR_OFFSET")) {
-        DBG_ERROR("4.Checksum outdoor offset (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum5 - spotOffsetB
-    EepromGetSwiftSpotOffsetbAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[SPOT_OFFSET_B], "5.SPOT_OFFSET_B")) {
-        DBG_ERROR("5.Checksum spotOffsetB (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum6 - spotOffsetA
-    EepromGetSwiftSpotOffsetaAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[SPOT_OFFSET_A], "6.SPOT_OFFSET_A")) {
-        DBG_ERROR("6.Checksum spotOffsetA (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum7 - tdcDelay
-    EepromGetSwiftTdcDelayAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[TDC_DELAY], "7.TDC_DELAY")) {
-        DBG_ERROR("7.Checksum tdcDelay (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum8 - refDistance
-    EepromGetSwiftRefDistanceAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[REF_DISTANCE], "8.REF_DISTANCE")) {
-        DBG_ERROR("8.Checksum refDistance (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum9 - proximity
-    EepromGetSwiftPxyAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[PROXIMITY], "9.PROXIMITY")) {
-        DBG_ERROR("9.Checksum proximity (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum10 - hotPixel & deadPixel
-    EepromGetSwiftMarkedPixelAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[HOTPIXEL_DEADPIXEL], "10.HOTPIXEL_DEADPIXEL")) {
-        DBG_ERROR("10.Checksum hotPixel & deadPixel (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum11 - WalkError
-    EepromGetSwiftWalkErrorAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[WALKERROR], "11.WALKERROR")) {
-        DBG_ERROR("11.Checksum WalkError (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum12 - SpotEnergy
-    EepromGetSwiftSpotEnergyAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[SPOT_ENERGY], "12.SPOT_ENERGY")) {
-        DBG_ERROR("12.Checksum SpotEnergy (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum13 - noise
-    EepromGetSwiftNoiseAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, offset, length, checkSum[NOISE], "13.NOISE")) {
-        DBG_ERROR("13.Checksum noise (offset:%d, length: %d) validation fail.\n", offset, length);
-        ret = -EIO;
-    }
-
-    // checksum_all 
-    EepromGetSwiftChecksumAddress(&offset, &length);
-    if (!check_crc8_4_eeprom_item(pEEPROMData, 0, eeprom_data_size - length, checkSum[CHECKSUM_ALL], "14.CHECKSUM_ALL")) {
-        DBG_ERROR("14.Checksum checksum_all validation fail, sizeof(swift_spot_module_eeprom_data_t)=%ld.\n", sizeof(swift_spot_module_eeprom_data_t));
-        ret = -EIO;
-    }
-
-    return ret;
-}
-
-int Misc_Device::check_crc32_4_flood_calib_eeprom_param(void)
-{
-    int i = 0,ret=0;
-    uint32_t read_crc32 = 0;
-    uint32_t calc_crc32 = 0;
-    uint8_t *pEEPROMData = (uint8_t *) p_flood_module_eeprom;
-
-    Utils *utils = new Utils();
-
-    //do page 0 crc
-    calc_crc32 = utils->crc32(0, (const unsigned char *) pEEPROMData, FLOOD_EEPROM_VERSION_INFO_SIZE + FLOOD_EEPROM_SN_INFO_SIZE);
-    if(p_flood_module_eeprom->Crc32Pg0 == calc_crc32)
-    {
-        DBG_INFO("EEPROM Crc32Pg0 matched!!! sizeof(swift_flood_module_eeprom_data_t)=%ld, calc_crc32:0x%x",
-                sizeof(swift_flood_module_eeprom_data_t),
-                calc_crc32);
-        //hex_data_dump((const u8 *) sensor->eeprom_data, 64, "eeprom data head");
-    }
-    else {
-        DBG_ERROR("EEPROM Crc32Pg0 MISMATCHED!!! FLOOD_EEPROM_ROISRAM_DATA_OFFSET=%ld, calc_crc32:0x%x,read Crc32Pg0:0x%x",
-                FLOOD_EEPROM_ROISRAM_DATA_OFFSET,
-                calc_crc32,
-                p_flood_module_eeprom->Crc32Pg0);
-        //hex_data_dump((const u8 *) sensor->eeprom_data, 64, "eeprom data head");
-        ret = -1;
-        //goto check_exit;
-    }
-
-    //do page 1 crc
-    calc_crc32 = utils->crc32(0, (const unsigned char *) pEEPROMData + FLOOD_EEPROM_MODULE_INFO_OFFSET, FLOOD_EEPROM_MODULE_INFO_SIZE);
-
-    if(p_flood_module_eeprom->Crc32Pg1 == calc_crc32)
-    {
-        DBG_INFO("EEPROM Crc32Pg1 matched!!! calc_crc32:0x%x",
-                calc_crc32);
-        //hex_data_dump((const u8 *) sensor->eeprom_data, 64, "eeprom data head");
-    }
-    else {
-        DBG_ERROR("EEPROM Crc32Pg1 MISMATCHED!!! calc_crc32:0x%x,read Crc32Pg1:0x%x",
-                calc_crc32,
-                p_flood_module_eeprom->Crc32Pg1);
-        ret = -1;
-        //goto check_exit;
-    }
-
-    //do page 2 crc
-    calc_crc32 = utils->crc32(0, (const unsigned char *) pEEPROMData + FLOOD_EEPROM_TDCDELAY_OFFSET, 
-        FLOOD_EEPROM_TDCDELAY_SIZE + FLOOD_EEPROM_INTRINSIC_SIZE + FLOOD_EEPROM_INDOOR_CALIBTEMPERATURE_SIZE
-        + FLOOD_EEPROM_OUTDOOR_CALIBTEMPERATURE_SIZE + FLOOD_EEPROM_INDOOR_CALIBREFDISTANCE_SIZE+FLOOD_EEPROM_OUTDOOR_CALIBREFDISTANCE_SIZE);
-    if(p_flood_module_eeprom->Crc32Pg2 == calc_crc32)
-    {
-        DBG_INFO("EEPROM Crc32Pg2 matched!!! calc_crc32:0x%x",
-                calc_crc32);
-    }
-    else {
-        DBG_ERROR("EEPROM Crc32Pg2 MISMATCHED!!! calc_crc32:0x%x,read Crc32Pg2:0x%x",
-                calc_crc32,
-                p_flood_module_eeprom->Crc32Pg2);
-        ret = -1;
-        //goto check_exit;
-    }
-
-    //do sram data crc for every zone
-    for ( i = 0; i < ZONE_COUNT_PER_SRAM_GROUP * CALIB_SRAM_GROUP_COUNT; ++i)
-    {
-        calc_crc32 = utils->crc32(0, (const unsigned char *) pEEPROMData + FLOOD_EEPROM_ROISRAM_DATA_OFFSET + i*FLOOD_MODULE_SRAM_ZONE_OCUPPY_SPACE, FLOOD_MODULE_SRAM_ZONE_VALID_DATA_LENGTH);
-        read_crc32 = *(uint32_t*)(pEEPROMData + FLOOD_EEPROM_ROISRAM_DATA_OFFSET + i*FLOOD_MODULE_SRAM_ZONE_OCUPPY_SPACE + FLOOD_MODULE_SRAM_ZONE_VALID_DATA_LENGTH);
-        if (calc_crc32 != read_crc32)
-        {
-            DBG_ERROR("SRAM %d CRC checksum MISMATCHED, calc_crc32=0x%x   read_crc32=0x%x\n", i, calc_crc32, read_crc32);
-            ret = -1;
-            //goto check_exit;
-        }
-        else
-        {
-            DBG_INFO("SRAM %d CRC checksum matched!!! sizeof(swift_flood_module_eeprom_data_t)=%ld, calc_crc32:0x%x",
-                i,
-                sizeof(swift_flood_module_eeprom_data_t),
-                calc_crc32);
-        }
-
-        //reset the crc in the eeprom to 0,because the algo will use these data
-        //*(uint32_t*)(p_eeprominfo->pRawData + i*SRAM_ZONE_OCUPPY_SPACE + SRAM_ZONE_VALID_DATA_LENGTH)=0;
-    }
-
-    //do offset crc 
-    for ( i = 0; i < 8; ++i)
-    {
-        calc_crc32 = utils->crc32(0, (unsigned char*)(p_flood_module_eeprom->spotOffset) + i * FLOOD_MODULE_OFFSET_VALID_DATA_LENGTH, FLOOD_MODULE_OFFSET_VALID_DATA_LENGTH);
-        if (calc_crc32 != p_flood_module_eeprom->Crc32Offset[i])
-        {
-            DBG_ERROR("offset %d CRC checksum MISMATCHED, read_crc=0x%x, calc_crc32:0x%x\n", i, p_flood_module_eeprom->Crc32Offset[i], calc_crc32);
-            ret = -1;
-            //goto check_exit;
-        }
-        else
-        {
-            DBG_INFO("offset %d CRC checksum matched!!! calc_crc32:0x%x", i, calc_crc32);
-        }
-    }
-
-//check_exit:
-    delete utils;
-
-    return ret;
-}
-
 int Misc_Device::dump_eeprom_data(u8* pEEPROM_Data)
 {
     if (ADS6401_MODULE_SPOT == module_static_data.module_type)
     {
+        swift_spot_module_eeprom_data_t *spot_module_eeprom = (swift_spot_module_eeprom_data_t *) pEEPROM_Data;
+
+        DBG_NOTICE("char    deviceName[64]                  = [%s]", spot_module_eeprom->deviceName);
+        DBG_NOTICE("float   intrinsic[9]                    = [%f,%f,%f,%f,%f,%f,%f,%f,%f]", 
+            spot_module_eeprom->intrinsic[0],
+            spot_module_eeprom->intrinsic[1],
+            spot_module_eeprom->intrinsic[2],
+            spot_module_eeprom->intrinsic[3],
+            spot_module_eeprom->intrinsic[4],
+            spot_module_eeprom->intrinsic[5],
+            spot_module_eeprom->intrinsic[6],
+            spot_module_eeprom->intrinsic[7],
+            spot_module_eeprom->intrinsic[8]
+            );
+        DBG_NOTICE("float   offset                          = %f", spot_module_eeprom->offset);
+        DBG_NOTICE("__u32   refSpadSelection                = 0x%08x", spot_module_eeprom->refSpadSelection);
+        DBG_NOTICE("__u32   driverChannelOffset[4]          = [0x%x,0x%x,0x%x,0x%x]", 
+            spot_module_eeprom->driverChannelOffset[0],
+            spot_module_eeprom->driverChannelOffset[1],
+            spot_module_eeprom->driverChannelOffset[2],
+            spot_module_eeprom->driverChannelOffset[3]);
+        DBG_NOTICE("__u32   distanceTemperatureCoefficient  = 0x%08x", spot_module_eeprom->distanceTemperatureCoefficient);
+        DBG_NOTICE("__u32   tdcDelay[16]                    = [0x%x,0x%x,...]", spot_module_eeprom->tdcDelay[0], spot_module_eeprom->tdcDelay[1]);
+        DBG_NOTICE("float   indoorCalibTemperature          = %f", spot_module_eeprom->indoorCalibTemperature);
+        DBG_NOTICE("float   indoorCalibRefDistance          = %f", spot_module_eeprom->indoorCalibRefDistance);
+        DBG_NOTICE("float   outdoorCalibTemperature         = %f", spot_module_eeprom->outdoorCalibTemperature);
+        DBG_NOTICE("float   outdoorCalibRefDistance         = %f", spot_module_eeprom->outdoorCalibRefDistance);
+        DBG_NOTICE("float   pxyDepth                        = %f", spot_module_eeprom->pxyDepth);
+        DBG_NOTICE("float   pxyNumberOfPulse                = %f", spot_module_eeprom->pxyNumberOfPulse);
+        DBG_NOTICE("char    moduleInfo[16]                  = [%s]", spot_module_eeprom->moduleInfo);
     }
     else if (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type) {
+        swift_flood_module_eeprom_data_t *small_flood_module_eeprom = (swift_flood_module_eeprom_data_t *) pEEPROM_Data;
+
+        DBG_NOTICE("char    Version[6]                      = [%s]", small_flood_module_eeprom->Version);
+        DBG_NOTICE("char    SerialNumber[16]                = [%s]", small_flood_module_eeprom->SerialNumber);
+        DBG_NOTICE("char    ModuleInfo[60]                  = [%s]", small_flood_module_eeprom->ModuleInfo);
+        DBG_NOTICE("uint8_t tdcDelay[2]                     = [0x%x,0x%x]", small_flood_module_eeprom->tdcDelay[0], small_flood_module_eeprom->tdcDelay[1]);
+        DBG_NOTICE("float   intrinsic[9]                    = [%f,%f,%f,%f,%f,%f,%f,%f,%f]", 
+            small_flood_module_eeprom->intrinsic[0],
+            small_flood_module_eeprom->intrinsic[1],
+            small_flood_module_eeprom->intrinsic[2],
+            small_flood_module_eeprom->intrinsic[3],
+            small_flood_module_eeprom->intrinsic[4],
+            small_flood_module_eeprom->intrinsic[5],
+            small_flood_module_eeprom->intrinsic[6],
+            small_flood_module_eeprom->intrinsic[7],
+            small_flood_module_eeprom->intrinsic[8]
+            );
+        DBG_NOTICE("float   indoorCalibTemperature          = %f", small_flood_module_eeprom->indoorCalibTemperature);
+        DBG_NOTICE("float   indoorCalibRefDistance          = %f", small_flood_module_eeprom->indoorCalibRefDistance);
+        DBG_NOTICE("float   outdoorCalibTemperature         = %f", small_flood_module_eeprom->outdoorCalibTemperature);
+        DBG_NOTICE("float   outdoorCalibRefDistance         = %f", small_flood_module_eeprom->outdoorCalibRefDistance);
     }
     else {
         swift_eeprom_v2_data_t *bigfov_module_eeprom = (swift_eeprom_v2_data_t *) pEEPROM_Data;
         
         DBG_NOTICE("//HEAD");
-        DBG_NOTICE("uint32_t    magic_id;                               = 0x%x", bigfov_module_eeprom->magic_id);
-        DBG_NOTICE("uint32_t    data_structure_version;                 = 0x%x", bigfov_module_eeprom->data_structure_version);
-        DBG_NOTICE("uint8_t     calibrationInfo[32];                    = [%s]", bigfov_module_eeprom->calibrationInfo);
-        DBG_NOTICE("uint8_t     LastCalibratedTime[32];                 = [%s]", bigfov_module_eeprom->LastCalibratedTime);
-        DBG_NOTICE("uint8_t     serialNumber[BIG_FOV_MODULE_SN_LENGTH]; = [%s]", bigfov_module_eeprom->serialNumber);
-        DBG_NOTICE("uint32_t    data_length;                            = %d", bigfov_module_eeprom->data_length);
-        DBG_NOTICE("uint32_t    data_crc32;                             = 0x%x", bigfov_module_eeprom->data_crc32);
-        DBG_NOTICE("uint32_t    compressed_data_length;                 = %d", bigfov_module_eeprom->compressed_data_length);
-        DBG_NOTICE("uint32_t    compressed_data_crc32;                  = 0x%x\n", bigfov_module_eeprom->compressed_data_crc32);
+        DBG_NOTICE("uint32_t    magic_id                                = 0x%x", bigfov_module_eeprom->magic_id);
+        DBG_NOTICE("uint32_t    data_structure_version                  = 0x%x", bigfov_module_eeprom->data_structure_version);
+        DBG_NOTICE("uint8_t     calibrationInfo[32]                     = [%s]", bigfov_module_eeprom->calibrationInfo);
+        DBG_NOTICE("uint8_t     LastCalibratedTime[32]                  = [%s]", bigfov_module_eeprom->LastCalibratedTime);
+        DBG_NOTICE("uint8_t     serialNumber[BIG_FOV_MODULE_SN_LENGTH]  = [%s]", bigfov_module_eeprom->serialNumber);
+        DBG_NOTICE("uint32_t    data_length                             = %d", bigfov_module_eeprom->data_length);
+        DBG_NOTICE("uint32_t    data_crc32                              = 0x%x", bigfov_module_eeprom->data_crc32);
+        DBG_NOTICE("uint32_t    compressed_data_length                  = %d", bigfov_module_eeprom->compressed_data_length);
+        DBG_NOTICE("uint32_t    compressed_data_crc32                   = 0x%x\n", bigfov_module_eeprom->compressed_data_crc32);
         
         DBG_NOTICE("//BASIC_DATA");
-        DBG_NOTICE("uint8_t     real_spot_zone_count;                   = %d", bigfov_module_eeprom->real_spot_zone_count);
-        DBG_NOTICE("uint8_t     tdcDelay[2];                            = [0x%x,0x%x]", bigfov_module_eeprom->tdcDelay[0], bigfov_module_eeprom->tdcDelay[1]);
-        DBG_NOTICE("uint8_t     lensType;                               = %d", bigfov_module_eeprom->lensType);
-        DBG_NOTICE("float       indoorCalibTemperature;                 = %f", bigfov_module_eeprom->indoorCalibTemperature);
-        DBG_NOTICE("float       indoorCalibRefDistance;                 = %f", bigfov_module_eeprom->indoorCalibRefDistance);
-        DBG_NOTICE("float       outdoorCalibTemperature;                = %f", bigfov_module_eeprom->outdoorCalibTemperature);
-        DBG_NOTICE("float       outdoorCalibRefDistance;                = %f", bigfov_module_eeprom->outdoorCalibRefDistance);
-        DBG_NOTICE("float       intrinsic[9];                           = [%f,%f,%f,%f,%f,%f,%f,%f,%f]", 
+        DBG_NOTICE("uint8_t     real_spot_zone_count                    = %d", bigfov_module_eeprom->real_spot_zone_count);
+        DBG_NOTICE("uint8_t     tdcDelay[2]                             = [0x%x,0x%x]", bigfov_module_eeprom->tdcDelay[0], bigfov_module_eeprom->tdcDelay[1]);
+        DBG_NOTICE("uint8_t     lensType                                = %d", bigfov_module_eeprom->lensType);
+        DBG_NOTICE("float       indoorCalibTemperature                  = %f", bigfov_module_eeprom->indoorCalibTemperature);
+        DBG_NOTICE("float       indoorCalibRefDistance                  = %f", bigfov_module_eeprom->indoorCalibRefDistance);
+        DBG_NOTICE("float       outdoorCalibTemperature                 = %f", bigfov_module_eeprom->outdoorCalibTemperature);
+        DBG_NOTICE("float       outdoorCalibRefDistance                 = %f", bigfov_module_eeprom->outdoorCalibRefDistance);
+        DBG_NOTICE("float       intrinsic[9]                            = [%f,%f,%f,%f,%f,%f,%f,%f,%f]", 
             bigfov_module_eeprom->intrinsic[0],
             bigfov_module_eeprom->intrinsic[1],
             bigfov_module_eeprom->intrinsic[2],
@@ -941,7 +643,7 @@ int Misc_Device::dump_eeprom_data(u8* pEEPROM_Data)
             bigfov_module_eeprom->intrinsic[7],
             bigfov_module_eeprom->intrinsic[8]
             );
-        DBG_NOTICE("float       rgb_intrinsic[8];                       = [%f,%f,%f,%f,%f,%f,%f,%f]", 
+        DBG_NOTICE("float       rgb_intrinsic[8]                        = [%f,%f,%f,%f,%f,%f,%f,%f]", 
             bigfov_module_eeprom->rgb_intrinsic[0],
             bigfov_module_eeprom->rgb_intrinsic[1],
             bigfov_module_eeprom->rgb_intrinsic[2],
@@ -951,7 +653,7 @@ int Misc_Device::dump_eeprom_data(u8* pEEPROM_Data)
             bigfov_module_eeprom->rgb_intrinsic[6],
             bigfov_module_eeprom->rgb_intrinsic[7]
             );
-        DBG_NOTICE("float       common_extrinsic[8];                    = [%f,%f,%f,%f,%f,%f,%f]", 
+        DBG_NOTICE("float       common_extrinsic[8]                     = [%f,%f,%f,%f,%f,%f,%f]", 
             bigfov_module_eeprom->common_extrinsic[0],
             bigfov_module_eeprom->common_extrinsic[1],
             bigfov_module_eeprom->common_extrinsic[2],
@@ -984,6 +686,11 @@ int Misc_Device::read_dtof_module_static_data(void)
 
             qApp->set_module_type(module_static_data.module_type);
 
+            if (true == Utils::is_env_var_true(ENV_VAR_DUMP_EEPROM_DATA))
+            {
+                dump_eeprom_data(mapped_eeprom_data_buffer);
+            }
+
             if (ADS6401_MODULE_SPOT == module_static_data.module_type)
             {
                 p_spot_module_eeprom = (swift_spot_module_eeprom_data_t *) mapped_eeprom_data_buffer;
@@ -1001,10 +708,6 @@ int Misc_Device::read_dtof_module_static_data(void)
             }
             else {
                 p_bigfov_module_eeprom = (swift_eeprom_v2_data_t *) mapped_eeprom_data_buffer;
-                if (true == Utils::is_env_var_true(ENV_VAR_DUMP_EEPROM_DATA))
-                {
-                    dump_eeprom_data(mapped_eeprom_data_buffer);
-                }
                 qApp->set_anchorOffset(0, 0); // non-spot module does not need anchor preprocess
 
                 pEEPROMData = (uint8_t *) p_bigfov_module_eeprom;
@@ -1018,22 +721,6 @@ int Misc_Device::read_dtof_module_static_data(void)
                 delete utils;
             }
 
-            if (false == Utils::is_env_var_true(ENV_VAR_SKIP_EEPROM_CRC_CHK))
-            {
-                if (ADS6401_MODULE_SPOT == module_static_data.module_type)
-                {
-                    ret = check_crc8_4_spot_calib_eeprom_param();
-                    ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
-                }
-                else if (ADS6401_MODULE_SMALL_FLOOD == module_static_data.module_type) {
-                    ret = check_crc32_4_flood_calib_eeprom_param();
-                    ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
-                }
-                else {
-                    // TODO for big FoV module
-                    ret = 0; // skip eeprom crc mismatch now, since there are some modules whose crc is mismatched.
-                }
-            }
         }
     }
 

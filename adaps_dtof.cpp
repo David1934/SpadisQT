@@ -32,8 +32,11 @@ ADAPS_DTOF::~ADAPS_DTOF()
     DBG_NOTICE("------decode statistics------work_mode: %d, m_input_frame_cnt: %d, m_output_frame_cnt: %d, decoded_rate: %d, flc.total_frames: %d, flc.dropped_frames: %d---\n",
         set_param.work_mode, m_input_frame_cnt, m_output_frame_cnt, m_input_frame_cnt/m_output_frame_cnt, flc.total_frames, flc.dropped_frames);
     p_misc_device = NULL_POINTER;
-    free(copied_roisram_4_anchorX);
-    copied_roisram_4_anchorX = NULL_POINTER;
+    if (NULL_POINTER != copied_roisram_4_anchorX)
+    {
+        free(copied_roisram_4_anchorX);
+        copied_roisram_4_anchorX = NULL_POINTER;
+    }
 }
 
 int ADAPS_DTOF::dump_frame_headinfo(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, enum sensor_workmode swk)
@@ -606,12 +609,12 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
 #endif
                 }
             }
-    
+
             if (dump_walkerror_param_cnt > 0 && NULL != setparam->walk_error_para_list)
             {
                 uint32_t i;
                 WalkErrorParam_t *pWalkErrParam = (WalkErrorParam_t *) setparam->walk_error_para_list;
-            
+
                 DBG_PRINTK("ParamIndex zoneId   spotId      x    y    paramD        paramX      paramY      paramZ      param0    sizeof(WalkErrorParam_t): %ld\n", sizeof(WalkErrorParam_t));
                 for (i = 0; i < dump_walkerror_param_cnt; i++)
                 {
@@ -729,6 +732,7 @@ int ADAPS_DTOF::initParams(WrapperDepthInitInputParams* initInputParams, Wrapper
         DBG_ERROR("p_eeprominfo is NULL for EEPROMInfo");
         return 0 - __LINE__;
     }
+
     FillSetWrapperParamFromEepromInfo((uint8_t* ) p_eeprominfo, &set_param, initInputParams);
 
     p_exposure_param = (struct adaps_dtof_exposure_param *) p_misc_device->get_dtof_exposure_param();
@@ -844,21 +848,10 @@ void ADAPS_DTOF::PrepareFrameParam(WrapperDepthCamConfig *wrapper_depth_map_conf
     else {
         wrapper_depth_map_config->frame_parameters.laser_realtime_tempe = t;
     }
-    //wrapper_depth_map_config->frame_parameters.laser_realtime_tempe = CHIP_TEMPERATURE_MAX_THRESHOLD;
-
-    //DBG_INFO( "adapsChipTemperature: %f\n " ,wrapper_depth_map_config->frame_parameters.laser_realtime_tempe);
 
     wrapper_depth_map_config->frame_parameters.measure_type_in = (AdapsMeasurementType) m_sns_param.measure_type;
-    //DBG_INFO("AdapsMeasurementType: %d \n" , wrapper_depth_map_config->frame_parameters.measure_type_in);
-
-//    wrapper_depth_map_config->frame_parameters.focutPoint[0] = 1;
-//    wrapper_depth_map_config->frame_parameters.focutPoint[1] = 2; //need to get this value
-    /*DBG_INFO("Adaps FocusPoint:x %d y %d \n", 
-                wrapper_depth_map_config->frame_parameters.focutPoint[0],
-                wrapper_depth_map_config->frame_parameters.focutPoint[1]);*/
 
     wrapper_depth_map_config->frame_parameters.env_type_in = (AdapsEnvironmentType) m_sns_param.env_type;
-   // DBG_INFO("AdapsEnvironmentType: %d \n" , wrapper_depth_map_config->frame_parameters.env_type_in);
 
     wrapper_depth_map_config->frame_parameters.advised_env_type_out     = &m_sns_param.advisedEnvType;
     wrapper_depth_map_config->frame_parameters.advised_measure_type_out = &m_sns_param.advisedMeasureType;
@@ -867,8 +860,6 @@ void ADAPS_DTOF::PrepareFrameParam(WrapperDepthCamConfig *wrapper_depth_map_conf
     wrapper_depth_map_config->frame_parameters.focusRoi.FocusLeftTopY = 0;
     wrapper_depth_map_config->frame_parameters.focusRoi.FocusRightBottomX = m_sns_param.out_frm_width;
     wrapper_depth_map_config->frame_parameters.focusRoi.FocusRightBottomY = m_sns_param.out_frm_height;
-
-    //wrapper_depth_map_config->frame_parameters.walkerror_enable = qApp->is_walkerror_enabled();
 }
 
 void ADAPS_DTOF::Distance_2_BGRColor(int bucketNum, float bucketSize, u16 distance, struct BGRColor *destColor)
@@ -1251,7 +1242,7 @@ SpotPoint* ADAPS_DTOF::get_spcific_histogram(uint16_t x, uint16_t y)
 
 int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, u16 depth16_buffer[], pc_pkt_t *point_cloud_buffer, enum sensor_workmode swk)
 {
-    int result=0;
+    int result = 0;
     bool done = false;
     uint32_t req_output_stream_cnt = 0;
     struct timeval tv;
@@ -1307,8 +1298,7 @@ int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_
             depthInput.save_path    = DEPTH_LIB_DATA_DUMP_PATH;
         }
 #endif
-        //DBG_INFO( "raw_width: %d raw_height: %d out_width: %d out_height: %d\n", m_sns_param.raw_width, m_sns_param.raw_height, m_sns_param.out_frm_width, m_sns_param.out_frm_height);
-    
+
         PrepareFrameParam(&depthConfig);
     
         if (0 == m_input_frame_cnt)

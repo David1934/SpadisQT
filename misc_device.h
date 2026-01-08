@@ -96,9 +96,6 @@ private:
     u8* mapped_roi_sram_data;
 
     int read_dtof_module_static_data(void);
-    int check_crc32_4_flood_calib_eeprom_param(void);
-    bool check_crc8_4_eeprom_item(uint8_t *pEEPROMData, uint32_t offset, uint32_t length, uint8_t savedCRC, const char *tag);
-    int check_crc8_4_spot_calib_eeprom_param(void);
     int get_next_line(const uint8_t *buffer, size_t buffer_len, size_t *pos, char *line, size_t line_len);
     int LoadItemsFromBuffer(const uint32_t ulBufferLen, const uint8_t* pucBuffer, ScriptItem* items, uint32_t* number);
     int parse_items(const uint32_t ulItemsCount, const ScriptItem *pstrItems);
