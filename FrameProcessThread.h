@@ -37,7 +37,6 @@ private:
     volatile bool sleeping;
     volatile bool skip_frame_decode;
     volatile uint32_t dump_spot_statistics_times;
-    volatile uint32_t dump_ptm_frame_headinfo_times;
     struct sensor_params sns_param;
     char *expected_md5_string;
 
@@ -50,6 +49,10 @@ private:
         u16 *depth_buffer;
         u32 depth_buffer_size;
         unsigned char *confidence_map_buffer;
+
+        struct SpotHistogram *rawHist;
+        int hist_count_to_get;
+        u32 rawHist_buffer_size;
     #endif
     Utils *utils;
     V4L2 *v4l2;
@@ -57,6 +60,7 @@ private:
     uint32_t outputed_frame_cnt;
     uint32_t dumped_frame_cnt;
     int stop_req_code;
+    int poll_timeout_ms;    // -1 for forever, > 0 for timeout time whose unit is ms
     bool save_frame(unsigned int frm_sequence, void *frm_buf, int buf_size, int frm_w, int frm_h, struct timeval frm_timestamp, enum frame_data_type);
 
 private slots:
@@ -75,6 +79,7 @@ signals:
         void newFrameReady4Display(unsigned int frm_sequence, QImage image, QImage img4confidence);
     #endif
     bool update_runtime_display(status_params2 param2);
+    void frame_rx_error(int err_reason);
     void threadLoopExit();
     void threadEnd(int exit_request_code);
 };

@@ -23,6 +23,8 @@
 #define OUTPUT_WIDTH_4_DTOF_SENSOR              210
 #define OUTPUT_HEIGHT_4_DTOF_SENSOR             160
 
+#define HISTOGRAM_HEIGHT                        253
+
 /* https://developer.android.com/reference/android/graphics/ImageFormat#DEPTH16
 *
 * Android dense depth image format.
@@ -85,11 +87,18 @@ public:
     void GetDepth4watchSpot(const u16 depth16_buffer[], const int outImgWidth, u8 x, u8 y, u16 *distance, u8 *confidence);
     void ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_colored_map[], u8 depth_confidence_map[], const int outImgWidth, const int outImgHeight);
     void ConvertGreyscaleToColoredMap(u16 depth16_buffer[], u8 depth_colored_map[], int outImgWidth, int outImgHeight);
-    int dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, u16 depth16_buffer[], pc_pkt_t *point_cloud_buffer, enum sensor_workmode swk);
+    int dtof_frame_decode(
+        enum sensor_workmode swk,
+        unsigned int frm_sequence,
+        unsigned char *frm_rawdata,
+        int frm_rawdata_size,
+        u16 depth16_buffer[],
+        pc_pkt_t *point_cloud_buffer,
+        struct SpotHistogram *hist_buf,
+        int *HistCountToGet);
     void adaps_dtof_release();
     int dumpSpotCount(const u16 depth16_buffer[], const int outImgWidth, const int outImgHeight, const uint32_t frm_sequence, const uint32_t out_frame_cnt, int decodeRet, int callline);
     int depthMapDump(const u16 depth16_buffer[], const int outImgWidth, const int outImgHeight, const uint32_t out_frame_cnt, int callline);
-    int dump_frame_headinfo(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, enum sensor_workmode swk);
     SpotPoint* get_spcific_histogram(uint16_t x, uint16_t y);
 
 private:
@@ -121,6 +130,12 @@ private:
     uint32_t loaded_roi_sram_size;
     int sub_frame_cnt_per_image_frame;
     volatile bool skip_frame_decode;
+    unsigned long firstOutputFrameTimeUsec;
+    float lastOutputFrameRate;
+    unsigned long lastReportDurationSecond;
+    uint8_t realSpotZoneCount;
+    volatile uint32_t dump_ptm_frame_headinfo_times;
+    uint32_t invalid_sram_id_frames;
 
     u8 frameCoordinatesMap[OUTPUT_HEIGHT_4_DTOF_SENSOR][OUTPUT_WIDTH_4_DTOF_SENSOR];
 
@@ -135,6 +150,11 @@ private:
     void init_frame_checker(FrameLossChecker *checker);
     int check_frame_loss(FrameLossChecker *checker, const unsigned char *buffer, size_t buffer_size);
     float get_frame_loss_rate(const FrameLossChecker *checker);
+    bool frame_head_valid_check(const uint8_t* raw_data, uint32_t frame_seq, bool roi_sram_rolling);
+#if defined(ENABLE_HISTOGRAM_RAW_OUTPUT)
+    int get_histogram_data(unsigned int frm_sequence, WrapperDepthOutput *output, struct SpotHistogram hist[], int *HistCountToGet);
+    void save_histogram_to_file(OUT_HISTOGRAM_TYPE hist_buf[], uint8_t x, uint8_t y);
+#endif
 };
 
 #endif // ADAPS_DTOF_H

@@ -71,8 +71,8 @@ public:
     UINT32 get_size_4_loaded_roisram();
     int set_size_4_loaded_roisram(UINT32 bytes);
 
-    UINT8 get_module_kernel_type();
-    int set_module_kernel_type(UINT8 value);
+    UINT8 get_adaps_algo_model_type();
+    int set_adaps_algo_model_type(UINT8 value);
     UINT8* get_loaded_walkerror_data();
     int set_loaded_walkerror_data(UINT8* value);
     UINT32 get_loaded_walkerror_data_size();
@@ -135,7 +135,7 @@ private:
     UINT8 usrCfgCoarseExposure;
     UINT8 usrCfgFineExposure;
     UINT8 usrCfgLaserExposurePeriod;
-    UINT8 module_kernel_type = 0;
+    UINT8 adaps_algo_model_type = 0;
 
     AdapsMeasurementType string_2_measurementtype(QString& str);
     AdapsEnvironmentType string_2_environmenttype(QString& str);

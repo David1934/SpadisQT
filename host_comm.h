@@ -82,6 +82,7 @@ private:
     uint16_t req_histogram_y = 0;
 
     Host_Communication(); // 私有构造函数（防止外部实例化）
+    static void destroyInstance();
 
     void reset_data();
     static int adaps_sender_callback(SenderEventId_t id, void* arg_ptr, uint32_t arg_u32, ...);
@@ -103,7 +104,7 @@ private:
     void adaps_request_device_reboot(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_set_rtc_time(CommandData_t* pCmdData, uint32_t rxDataLen);
     void adaps_set_req_histogram_position(CommandData_t* pCmdData, uint32_t rxDataLen);
-    void adaps_set_module_kernel_type(CommandData_t* pCmdData, uint32_t rxDataLen);
+    void adaps_set_adaps_algo_model_type(CommandData_t* pCmdData, uint32_t rxDataLen);
 
     void adaps_event_process(void* pRXData, uint32_t rxDataLen);
     void adaps_sender_disconnected(void);

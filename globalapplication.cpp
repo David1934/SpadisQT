@@ -384,16 +384,16 @@ int GlobalApplication::set_RealDistanceMaxMappedRange(float value)
     return ret;
 }
 
-UINT8 GlobalApplication::get_module_kernel_type()
+UINT8 GlobalApplication::get_adaps_algo_model_type()
 {
-    return module_kernel_type;
+    return adaps_algo_model_type;
 }
 
-int GlobalApplication::set_module_kernel_type(UINT8 value)
+int GlobalApplication::set_adaps_algo_model_type(UINT8 value)
 {
     int ret = 0;
 
-    module_kernel_type = value;
+    adaps_algo_model_type = value;
 
     return ret;
 }

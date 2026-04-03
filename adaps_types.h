@@ -53,9 +53,9 @@ typedef struct ADAPS_MIRROR_FRAME_SET
 
 // adaps tof operation mode
 typedef enum swift_work_mode {
-    ADAPS_PTM_PHR_MODE   = 0,
-    ADAPS_PCM_MODE = 1,
-    ADAPS_PTM_FHR_MODE   = 2,
+    ADAPS_PTM_PHR_MODE   = 0,       // Photon Time Measurement - Partial Histogram mode
+    ADAPS_PCM_MODE = 1,             // Photon Count Mode
+    ADAPS_PTM_FHR_MODE   = 2,       // Photon Time Measurement - Full Histogram mode
     ADAPS_PTM_DEBUG_PHR_MODE = 3,
     ADAPS_PTM_DEBUG_FHR_MODE=4,
     ADAPS_MODE_MAX,

@@ -21,44 +21,28 @@ ADAPS_DTOF::ADAPS_DTOF(struct sensor_params params)
     m_conversionLibInited = false;
     m_input_frame_cnt = 0;
     m_output_frame_cnt = 0;
+    firstOutputFrameTimeUsec = 0;
+    lastOutputFrameRate = 0.0;
+    lastReportDurationSecond = 0;
+    realSpotZoneCount = 4; // set the default value.
     copied_roisram_4_anchorX = NULL_POINTER;
     p_misc_device = qApp->get_misc_dev_instance();
     init_frame_checker(&flc);
     skip_frame_decode = Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_DECODE);
+    dump_ptm_frame_headinfo_times = Utils::get_env_var_intvalue(ENV_VAR_DUMP_PTM_FRAME_HEADINFO_TIMES);
+    invalid_sram_id_frames = 0;
 }
 
 ADAPS_DTOF::~ADAPS_DTOF()
 {
-    DBG_NOTICE("------decode statistics------work_mode: %d, m_input_frame_cnt: %d, m_output_frame_cnt: %d, decoded_rate: %d, flc.total_frames: %d, flc.dropped_frames: %d---\n",
-        set_param.work_mode, m_input_frame_cnt, m_output_frame_cnt, m_input_frame_cnt/m_output_frame_cnt, flc.total_frames, flc.dropped_frames);
+    DBG_NOTICE("------decode statistics------work_mode: %d, in_frm_cnt: %d, out_frm_cnt: %d, decoded_rate: %d, flc.total_frames: %d, flc.dropped_frames: %d, invalid_sram_id_frames: %d---\n",
+        set_param.work_mode, m_input_frame_cnt, m_output_frame_cnt, m_input_frame_cnt/m_output_frame_cnt, flc.total_frames, flc.dropped_frames, invalid_sram_id_frames);
     p_misc_device = NULL_POINTER;
     if (NULL_POINTER != copied_roisram_4_anchorX)
     {
         free(copied_roisram_4_anchorX);
         copied_roisram_4_anchorX = NULL_POINTER;
     }
-}
-
-int ADAPS_DTOF::dump_frame_headinfo(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, enum sensor_workmode swk)
-{
-    if (frm_rawdata == NULL_POINTER || frm_rawdata_size < 3) {
-        return -1;  // Invalid input
-    }
-
-    if (WK_DTOF_FHR != swk && WK_DTOF_PHR != swk) {
-        return -1;  // Invalid input
-    }
-
-#if 1
-    DBG_NOTICE("sram_id: %d, zone_id: %d, frame_id: %d, frm_sequence: %d.", frm_rawdata[0], frm_rawdata[1], frm_rawdata[2], frm_sequence);
-#else
-    Utils *utils;
-    utils = new Utils();
-    utils->hexdump(frm_rawdata, 256, "first 256 bytes of frame raw data");
-    delete utils;
-#endif
-
-    return 0;
 }
 
 // Initialize the frame loss checker
@@ -111,6 +95,53 @@ float ADAPS_DTOF::get_frame_loss_rate(const FrameLossChecker *checker)
     }
     return (float)checker->dropped_frames / 
            (float)(checker->total_frames - 1) * 100.0f;
+}
+
+bool ADAPS_DTOF::frame_head_valid_check(const uint8_t* raw_data, uint32_t frame_seq, bool roi_sram_rolling)
+{
+    if (raw_data == NULL) {
+        DBG_ERROR("Invalid input: raw_data is NULL");
+        return false;
+    }
+
+    uint8_t sram_id = raw_data[0];
+    uint8_t zone_id = raw_data[1];
+    uint8_t frame_id = raw_data[2];
+
+    if (roi_sram_rolling)
+    {
+        // 2. 检查sram_id（0/1，每4帧切换一次）
+        uint8_t expected_sram_id = (frame_seq / 4) % 2; // 0-3=0,4-7=1,8-11=0...
+
+        if (frame_seq < dump_ptm_frame_headinfo_times && 0 != dump_ptm_frame_headinfo_times)
+        {
+            DBG_NOTICE("sram_id: %d, zone_id: %d, frame_id: %d, frm_sequence: %d.", raw_data[0], raw_data[1], raw_data[2], frame_seq);
+        }
+
+        if (sram_id != expected_sram_id) {
+            DBG_ERROR("SRAM_ID check failed! Frame_seq: %u, Expected: %u, Actual: %u", frame_seq, expected_sram_id, sram_id);
+            invalid_sram_id_frames++;
+            return false;
+        }
+    }
+
+    // 3. 检查zone_id（1,2,4,8循环）
+    uint8_t zone_id_table[] = {1, 2, 4, 8}; // 循环表
+    uint8_t expected_zone_id = zone_id_table[frame_seq % 4]; // 按帧序号取模
+    if (zone_id != expected_zone_id) {
+        DBG_ERROR("ZONE_ID check failed! Frame_seq: %u, Expected: %u, Actual: %u", frame_seq, expected_zone_id, zone_id);
+        return false;
+    }
+
+    // 4. 检查frame_id（0x00~0xFF循环）
+    uint8_t expected_frame_id = frame_seq % 0x100; // 0-255循环
+    if (frame_id != expected_frame_id) {
+        DBG_ERROR("FRAME_ID check failed! Frame_seq: %u, Expected: 0x%02X, Actual: 0x%02X", frame_seq, expected_frame_id, frame_id);
+        return false;
+    }
+
+    // 所有检查通过
+    return true;
 }
 
 u8 ADAPS_DTOF::normalizeGreyscale(u16 range) {
@@ -347,6 +378,7 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
         setparam->spot_cali_data = (uint8_t* ) loaded_roi_sram_data;
         initInputParams->pRawData = set_param.spot_cali_data;
         initInputParams->rawDataSize = loaded_roi_sram_size;
+        realSpotZoneCount = loaded_roi_sram_size / PER_CALIB_SRAM_ZONE_SIZE;
 
         if (true == Utils::is_env_var_true(ENV_VAR_ROI_SRAM_COORDINATES_CHECK))
         {
@@ -367,6 +399,7 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
 
             // create another buffer copy for anchorX operation to keep the original mmaped ROI sram data not be changed.
             initInputParams->rawDataSize = PER_ROISRAM_GROUP_SIZE; // ADS6401_EEPROM_ROISRAM_DATA_SIZE;
+            realSpotZoneCount = initInputParams->rawDataSize / PER_CALIB_SRAM_ZONE_SIZE;
 
             memcpy(copied_roisram_4_anchorX, pEEPROMData + ADS6401_EEPROM_ROISRAM_DATA_OFFSET, initInputParams->rawDataSize);
             setparam->spot_cali_data = copied_roisram_4_anchorX;
@@ -383,6 +416,7 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
             else {
                 initInputParams->rawDataSize = PER_ROISRAM_GROUP_SIZE; // FLOOD_EEPROM_ROISRAM_DATA_SIZE;
             }
+            realSpotZoneCount = initInputParams->rawDataSize / PER_CALIB_SRAM_ZONE_SIZE;
 
             setparam->spot_cali_data          = pEEPROMData + FLOOD_EEPROM_ROISRAM_DATA_OFFSET;
             initInputParams->pRawData = set_param.spot_cali_data;
@@ -390,6 +424,7 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
         else
         {
             swift_eeprom_v2_data_t *p_bigfov_module_eeprom = (swift_eeprom_v2_data_t *) pEEPROMData;
+            realSpotZoneCount = p_bigfov_module_eeprom->real_spot_zone_count;
             initInputParams->rawDataSize = p_bigfov_module_eeprom->real_spot_zone_count * PER_CALIB_SRAM_ZONE_SIZE;
 
             setparam->spot_cali_data          = pEEPROMData + BIG_FOV_MODULE_EEPROM_ROISRAM_DATA_OFFSET;
@@ -463,10 +498,10 @@ int ADAPS_DTOF::FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapp
     {
         uint32_t i;
 
-        DBG_PRINTK("First %d offset data dump to Algo lib\n", dump_offsetdata_param_cnt);
+        DBG_PRINTK("First %d offset data dump to Algo lib, SpodOffsetDataLength: %d\n", dump_offsetdata_param_cnt, setparam->adapsSpodOffsetDataLength);
         for (i = 0; i < dump_offsetdata_param_cnt; i++)
         {
-            DBG_PRINTK("   %4d      %f\n", i, setparam->adapsSpodOffsetData[i]);
+            DBG_PRINTK("   Offset[%4d] = %f\n", i, setparam->adapsSpodOffsetData[i]);
         }
     }
 
@@ -691,7 +726,7 @@ int ADAPS_DTOF::initParams(WrapperDepthInitInputParams* initInputParams, Wrapper
 #endif
 
 #if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 6, 5)
-    set_param.moduleKernelType = qApp->get_module_kernel_type();
+    set_param.adapsAlgoModelType = qApp->get_adaps_algo_model_type();
 #endif
 
     // always allow to check environment variable to change these setting for debug.
@@ -771,11 +806,18 @@ int ADAPS_DTOF::initParams(WrapperDepthInitInputParams* initInputParams, Wrapper
     }
 
 #if defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB)
-    DBG_NOTICE("initParams success, roi_sram_size: %d, roi_sram_rolling: %d, walkerror: %d, loaded_roi_sram_size: %d, work_mode=%d env_type=%d  measure_type=%d", 
-         initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), set_param.walkerror, loaded_roi_sram_size, set_param.work_mode,set_param.env_type,set_param.measure_type);
+    DBG_NOTICE("initParams success, roi_sram_size: %d, roi_sram_rolling: %d, realSpotZoneCount: %d, loaded_roi_sram_size: %d, work_mode=%d env_type=%d  measure_type=%d", 
+         initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), realSpotZoneCount, loaded_roi_sram_size, set_param.work_mode,set_param.env_type,set_param.measure_type);
 #else
-    DBG_NOTICE("initParams success, roi_sram_size: %d, roi_sram_rolling: %d, walkerror: %d, loaded_roi_sram_size: %d, SpodOffsetDataLength: %d, walk_error_data_size: %d, work_mode=%d env_type=%d  measure_type=%d, moduleKernelType: %d", 
-        initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), set_param.walkerror, loaded_roi_sram_size, set_param.adapsSpodOffsetDataLength, set_param.walk_error_para_list_length, set_param.work_mode,set_param.env_type,set_param.measure_type, set_param.moduleKernelType);
+    DBG_NOTICE("initParams success, roi_sram_size: %d, roi_sram_rolling: %d, realSpotZoneCount: %d, loaded_roi_sram_size: %d, walk_error_data_size: %d, work_mode=%d env_type=%d, measure_type=%d, adapsAlgoModelType: %d, ENABLE_HISTOGRAM_RAW_OUTPUT: %s",
+        initInputParams->rawDataSize, qApp->is_roi_sram_rolling(), realSpotZoneCount, loaded_roi_sram_size, set_param.walk_error_para_list_length,
+        set_param.work_mode,set_param.env_type,set_param.measure_type, set_param.adapsAlgoModelType,
+    #if defined(ENABLE_HISTOGRAM_RAW_OUTPUT)
+        "Yes"
+    #else
+        "No"
+    #endif
+        );
 #endif
 
     return 0;
@@ -1219,7 +1261,7 @@ SpotPoint* ADAPS_DTOF::get_spcific_histogram(uint16_t x, uint16_t y)
     SpotPoint* spotPoint = NULL_POINTER;
     bool found = false;
 
-    for (int group = 0; group < MAX_SRAM_DATA_NUMBERS ; group++) {
+    for (int group = 0; group < realSpotZoneCount / ZONE_SIZE ; group++) {
         for (int zone = 0; zone < ZONE_SIZE ; zone++) {
             for (int i = 0; i < SWIFT_SPOT_COUNTS_PER_ZONE; i++) {
                 //SpotPoint* spotPoint = *(depthOutputs[0].outAllPointsPtr[0][group][zone] + i);
@@ -1240,7 +1282,129 @@ SpotPoint* ADAPS_DTOF::get_spcific_histogram(uint16_t x, uint16_t y)
     }
 }
 
-int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_rawdata, int frm_rawdata_size, u16 depth16_buffer[], pc_pkt_t *point_cloud_buffer, enum sensor_workmode swk)
+#if defined(ENABLE_HISTOGRAM_RAW_OUTPUT)
+/**
+ * 将 uint16 数组转换为文本直方图并保存
+ * @param buf 长度为 512 的数组
+ * @param x, y 仅用于文件名格式化
+ */
+void ADAPS_DTOF::save_histogram_to_file(OUT_HISTOGRAM_TYPE hist_buf[], uint8_t x, uint8_t y)
+{
+    char filename[64];
+    sprintf(filename, "%shistRaw_for_spot_%d_%d.txt", TMP_SAVE_PATH, x, y);
+
+    if (env_var_is_true(ENV_VAR_DBGINFO_ENABLE))
+    {
+        for (int i = 0; i < OUT_HISTOGRAM_LEN; i++) {
+            printf("histRaw_buf[%03d] = %d\n", i, hist_buf[i]);
+        }
+    }
+
+    FILE *fp = fopen(filename, "w");
+    if (fp == NULL) {
+        DBG_ERROR("Fail to create file %s\n", filename);
+        return;
+    }
+
+    // 外层循环：从最高行 (y=HISTOGRAM_HEIGHT) 扫向地面 (y=0)
+    for (int row = HISTOGRAM_HEIGHT - 1; row >= 0; row--) {
+        for (int col = 0; col < OUT_HISTOGRAM_LEN; col++) {
+            // 如果当前行号小于 buf 中的高度值，则填充 '#'
+            // 比如 buf[col] = 200, 则 row 在 0-199 之间时输出 '#'
+            if (row < (int)hist_buf[col]) {
+                fputc('#', fp);
+            } else {
+                fputc('.', fp);
+            }
+        }
+        fputc('\n', fp); // 换行
+    }
+
+    fclose(fp);
+}
+
+int ADAPS_DTOF::get_histogram_data(unsigned int frm_sequence, WrapperDepthOutput *output, struct SpotHistogram hist[], int *HistCountToGet)
+{
+    int count = 0;
+    SpotPoint* spotPoint;
+
+    for (int groupIdx = 0; groupIdx < realSpotZoneCount / ZONE_SIZE; groupIdx++) {
+        for (int zoneIdx = 0; zoneIdx < ZONE_SIZE; zoneIdx++) {
+            for (int spotIdx = 0; spotIdx < SWIFT_SPOT_COUNTS_PER_ZONE; spotIdx++) {
+                spotPoint = (* output->outAllPointsPtr)[groupIdx][zoneIdx][spotIdx];
+
+                if (NULL_POINTER == spotPoint)
+                {
+                    DBG_ERROR("spotPoint is NULL at outAllPointsPtr[%d][%d][%d]", groupIdx, zoneIdx, spotIdx);
+                    return -1;
+                }
+
+                if (0 == spotPoint->x && 0 == spotPoint->y)
+                {
+                    //DBG_ERROR("Found spot(0,0) at outAllPointsPtr[%d][%d][%d]", groupIdx, zoneIdx, spotIdx);
+                    continue;
+                }
+
+                if (spotPoint->x > OUTPUT_WIDTH_4_DTOF_SENSOR|| spotPoint->y > OUTPUT_HEIGHT_4_DTOF_SENSOR)
+                {
+                    DBG_ERROR("spot(%d,%d) is out of the range at outAllPointsPtr[%d][%d][%d]", spotPoint->x, spotPoint->y, groupIdx, zoneIdx, spotIdx);
+                    continue;
+                }
+
+                hist[count].x = (uint8_t ) spotPoint->x;
+                hist[count].y = (uint8_t ) spotPoint->y;
+#if 0
+                if (5 == count && 7 == frm_sequence)
+                {
+                    DBG_INFO("-----before spotPoint->histRaw print------");
+                    for (int i = 0; i < OUT_HISTOGRAM_LEN; i++) {
+                        printf("spotPoint->histRaw[%03d] = %d\n", i, spotPoint->histRaw[i]);
+                    }
+                }
+#endif
+
+#if defined(OUT_HISTOGRAM_TYPE) && (OUT_HISTOGRAM_TYPE == uint8_t)
+                for (int t = 0; t < OUT_HISTOGRAM_LEN; t++) {
+                    hist[count].rawHistogram[t] = (uint8_t) (spotPoint->histRaw[t]);
+                }
+#elif defined(OUT_HISTOGRAM_TYPE) && (OUT_HISTOGRAM_TYPE == uint16_t)
+                memcpy(hist[count].rawHistogram, spotPoint->histRaw, OUT_HISTOGRAM_LEN * sizeof(OUT_HISTOGRAM_TYPE));
+#else
+                #error "OUT_HISTOGRAM_TYPE must be defined either uint8_t or uint16_t"
+#endif
+
+#if 0
+                if (5 == count && 7 == frm_sequence)
+                {
+                    DBG_INFO("-----before save_histogram_to_file------");
+                    save_histogram_to_file(hist[count].rawHistogram, hist[count].x, hist[count].y);
+                }
+#endif
+
+                count++;
+
+                if ((0 != *HistCountToGet) && (count >= *HistCountToGet))
+                    return 0;
+            }
+        }
+    }
+
+    DBG_INFO("Request %d, real get %d histogram data for frame %d\n", *HistCountToGet, count, frm_sequence);
+    *HistCountToGet = count;
+
+    return 0;
+}
+#endif
+
+int ADAPS_DTOF::dtof_frame_decode(
+    enum sensor_workmode swk,
+    unsigned int frm_sequence,
+    unsigned char *frm_rawdata,
+    int frm_rawdata_size,
+    u16 depth16_buffer[],
+    pc_pkt_t *point_cloud_buffer,
+    struct SpotHistogram *hist_buf,
+    int *HistCountToGet)
 {
     int result = 0;
     bool done = false;
@@ -1253,7 +1417,7 @@ int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_
 
     if (false == m_conversionLibInited)
     {
-        DBG_ERROR("ConversionLib Init Fail \n");
+        DBG_ERROR("ConversionLib Init Fail");
         return -1;
     }
 
@@ -1263,11 +1427,19 @@ int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_
         return -1;
     }
 
-    if ((WK_DTOF_PCM != swk) && (true == Utils::is_env_var_true(ENV_VAR_FRAME_DROP_CHECK_ENABLE)))
+    if (WK_DTOF_PCM != swk)
     {
-        int lost = check_frame_loss(&flc, frm_rawdata, frm_rawdata_size);
-        if (lost > 0) {
-            DBG_ERROR("lost %d frames, last_id: %d, frm_sequence: %d\n", lost, flc.last_id, frm_sequence);
+        bool valid = frame_head_valid_check(frm_rawdata, frm_sequence, qApp->is_roi_sram_rolling());
+        if (false == valid) {
+            DBG_ERROR("Found invalid frame head for frm_sequence: %d\n", frm_sequence);
+        }
+
+        if (true == Utils::is_env_var_true(ENV_VAR_FRAME_DROP_CHECK_ENABLE))
+        {
+            int lost = check_frame_loss(&flc, frm_rawdata, frm_rawdata_size);
+            if (lost > 0) {
+                DBG_ERROR("lost %d frames, last_id: %d, frm_sequence: %d\n", lost, flc.last_id, frm_sequence);
+            }
         }
     }
 
@@ -1336,7 +1508,6 @@ int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_
 
         if (WK_DTOF_PCM != swk)
         {
-            
             if(m_input_frame_cnt % sub_frame_cnt_per_image_frame == 0)
                 done = 1;
             else
@@ -1350,6 +1521,39 @@ int ADAPS_DTOF::dtof_frame_decode(unsigned int frm_sequence, unsigned char *frm_
     if (true == done)
     {
         m_output_frame_cnt++;
+
+        if ((true == Utils::is_env_var_true(ENV_VAR_TRACE_OUTPUT_FRAME_RATE)) && (WK_DTOF_PCM != swk))
+        {
+            gettimeofday(&tv,NULL_POINTER);
+            if (1 == m_output_frame_cnt)
+            {
+                firstOutputFrameTimeUsec = tv.tv_sec*1000000 + tv.tv_usec;
+            }
+            else {
+                float cur_fps;
+                unsigned long currTimeUsec, durationSecond;
+                currTimeUsec = tv.tv_sec*1000000 + tv.tv_usec;
+                durationSecond = ((currTimeUsec - firstOutputFrameTimeUsec)/1000000);
+                cur_fps = (float) (m_output_frame_cnt - 1) / durationSecond;
+                if ((cur_fps < FPS_THRESHOLD_TO_WARNING) || (abs(lastOutputFrameRate - cur_fps) > 1.0) || ((durationSecond - lastReportDurationSecond) > FPS_REPORT_INTERVAL))
+                {
+                    DBG_NOTICE("Final_output_fps: %f (%f), m_input_frame_cnt: %d, output_frm_cnt: %d, streaming-duration: %ld seconds.\n",
+                        cur_fps, lastOutputFrameRate, m_input_frame_cnt, m_output_frame_cnt, durationSecond);
+                    lastOutputFrameRate = cur_fps;
+                    lastReportDurationSecond = durationSecond;
+                }
+            }
+        }
+
+#if defined(ENABLE_HISTOGRAM_RAW_OUTPUT)
+        if ((WK_DTOF_PCM != swk) && (0 != *HistCountToGet) && (NULL_POINTER != hist_buf))
+        {
+            get_histogram_data(frm_sequence, &depthOutputs[0], hist_buf, HistCountToGet);
+        }
+#else
+        *HistCountToGet = 0;
+#endif
+
         result = 0;
     }
     else {

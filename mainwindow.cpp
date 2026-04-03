@@ -100,7 +100,7 @@ MainWindow::MainWindow()
     connect(host_comm, &Host_Communication::stop_capture, this, &MainWindow::on_stopCapture);
 
     qRegisterMetaType<capture_req_param_t*>("capture_req_param_t*");
-    connect(host_comm, &Host_Communication::set_capture_options, this, &MainWindow::on_capture_options_set);
+    connect(host_comm, &Host_Communication::set_capture_options, this, &MainWindow::on_captureOptionsSet);
 #endif
 #endif
 
@@ -189,14 +189,14 @@ void MainWindow::startFrameProcessThread(void)
 #if defined(RUN_ON_EMBEDDED_LINUX) && !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
         if (host_comm)
         {
-            char err_msg[] = "Fail to frame_process_thread init\nPls check device side log for detailed info!";
+            char err_msg[] = "Fail to start to capture stream\nPls check device side log for detailed info!";
             host_comm->report_status(CMD_HOST_SIDE_START_CAPTURE, CMD_DEVICE_SIDE_ERROR_FAIL_TO_START_CAPTURE, err_msg, strlen(err_msg));
         }
 #endif
 
-        DBG_ERROR("Fail to frame_process_thread init()...");
+        DBG_ERROR("Fail to start to capture stream...");
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
-        ui->depth_view->setText("Fail to frame_process_thread init(),\nPlease check camera is ready or not?");
+        ui->depth_view->setText("Fail to start to capture stream,\nPlease check the hardware is ready or not?");
 #endif
         delete frame_process_thread;
         frame_process_thread = NULL_POINTER;
@@ -206,6 +206,7 @@ void MainWindow::startFrameProcessThread(void)
 
     displayedFrameCnt = 0;
     connect(frame_process_thread, SIGNAL(threadEnd(int)), this, SLOT(onThreadEnd(int)));
+    connect(frame_process_thread, SIGNAL(frame_rx_error(int)), this, SLOT(onFrameRxErrorHandle(int)));
 
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
     qRegisterMetaType<enum frame_data_type>("enum frame_data_type");
@@ -262,8 +263,8 @@ void MainWindow::onThreadEnd(int stop_request_code)
         case STOP_REQUEST_QUIT:
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
             this->close();
-            qApp->exit(0); // exit from the application
 #endif
+            qApp->exit(0); // exit from the application
             break;
 
         case STOP_REQUEST_STOP:
@@ -282,6 +283,48 @@ void MainWindow::onThreadEnd(int stop_request_code)
             break;
     }
 
+}
+
+void MainWindow::onFrameRxErrorHandle(int err_reason)
+{
+    uint16_t status_code = 0;
+    char err_msg[256];
+
+    switch (err_reason) {
+        case FRAME_RX_ERROR_TIMEOUT:
+            strcpy(err_msg, "mipi frame recieve timeout\nPlease check!");
+            status_code = CMD_DEVICE_SIDE_ERROR_CAPTURE_TIMEOUT;
+#if !defined(CONSOLE_APP_WITHOUT_GUI)
+            ui->depth_view->setText(err_msg);
+#endif
+            break;
+
+        case FRAME_RX_ERROR_POLL:
+            strcpy(err_msg, "mipi frame poll failure\nPlease check!");
+            status_code = CMD_DEVICE_SIDE_ERROR_CAPTURE_FAILURE;
+#if !defined(CONSOLE_APP_WITHOUT_GUI)
+            ui->depth_view->setText(err_msg);
+#endif
+            break;
+
+        case FRAME_RX_ERROR_USER_BREAK:
+            strcpy(err_msg, "Streaming is terminated by user\nApp is exiting...");
+            status_code = CMD_DEVICE_SIDE_ERROR_CAPTURE_BREAK;
+#if !defined(CONSOLE_APP_WITHOUT_GUI)
+            ui->depth_view->setText(err_msg);
+#endif
+            break;
+
+        default:
+            break;
+    }
+
+#if defined(RUN_ON_EMBEDDED_LINUX) && !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
+    if (host_comm)
+    {
+        host_comm->report_status(CMD_HOST_SIDE_START_CAPTURE, status_code, err_msg, strlen(err_msg));
+    }
+#endif
 }
 
 void MainWindow::Quit(void)
@@ -377,7 +420,7 @@ void MainWindow::unixSignalHandler(int signal)
             if (host_comm)
             {
                 char err_msg[] = "The device-side application was terminated by the user.\nStream capture is aborted!";
-                host_comm->report_status(CMD_HOST_SIDE_START_CAPTURE, CMD_DEVICE_SIDE_ERROR_CAPTURE_ABORT, err_msg, strlen(err_msg));
+                host_comm->report_status(CMD_HOST_SIDE_START_CAPTURE, CMD_DEVICE_SIDE_ERROR_CAPTURE_BREAK, err_msg, strlen(err_msg));
             }
 #endif
             Quit();
@@ -416,7 +459,7 @@ void MainWindow::on_stopCapture()
 }
 
 #if defined(RUN_ON_EMBEDDED_LINUX) && !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
-void MainWindow::on_capture_options_set(capture_req_param_t* param)
+void MainWindow::on_captureOptionsSet(capture_req_param_t* param)
 {
     switch (param->work_mode) 
     {
@@ -900,7 +943,7 @@ void MainWindow::captureAndSaveScreenshot()
     QString timeStr = currentDateTime.toString("HHmmss");
 
     // 构建保存路径
-    QString savePath = QString(DATA_SAVE_PATH "Screenshot_4_process%1_%2_%3." CAPTURED_PICTURE_FMT)
+    QString savePath = QString(TMP_SAVE_PATH "Screenshot_4_process%1_%2_%3." CAPTURED_PICTURE_FMT)
                            .arg(processId)
                            .arg(dateStr)
                            .arg(timeStr);

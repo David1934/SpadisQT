@@ -29,8 +29,17 @@ Host_Communication* Host_Communication::instance = NULL_POINTER;
 Host_Communication* Host_Communication::getInstance() {
     if (!instance) {
         instance = new Host_Communication();
+        // 注册清理函数，程序退出时自动调用
+        std::atexit(destroyInstance);
     }
     return instance;
+}
+
+void Host_Communication::destroyInstance() {
+    if (instance) {
+        delete instance;
+        instance = nullptr;
+    }
 }
 
 // 私有构造函数
@@ -43,14 +52,12 @@ Host_Communication::Host_Communication() {
 
 Host_Communication::~Host_Communication()
 {
-    if (NULL_POINTER != instance) {
-        DBG_NOTICE("------communication statistics------total txRawdataFrameCnt: %ld (%d fps), txDepth16FrameCnt: %ld (%d fps), txPointCloudFrameCnt: %ld (%d fps)---\n",
-            txRawdataFrameCnt, txRawdataFrame_fps, txDepth16FrameCnt, txDepth16Frame_fps, txPointCloudFrameCnt, txPointCloudFrame_fps);
+    DBG_NOTICE("------communication statistics---instance: %p---total txRawdataFrameCnt: %ld (%d fps), txDepth16FrameCnt: %ld (%d fps), txPointCloudFrameCnt: %ld (%d fps)---\n",
+        instance, txRawdataFrameCnt, txRawdataFrame_fps, txDepth16FrameCnt, txDepth16Frame_fps, txPointCloudFrameCnt, txPointCloudFrame_fps);
 
+    if (NULL_POINTER != instance) {
         reset_data();
         sender_destroy();
-        delete instance;
-        instance = NULL_POINTER;
     }
 }
 
@@ -258,7 +265,7 @@ bool Host_Communication::save_data_2_bin_file(const char *prefix, void *buf, int
     char *          LocalTimeStr = (char *) currentTime.toStdString().c_str();
     char *          filename = new char[128];
 
-    sprintf(filename, "%s%s_%u_%s.bin", DATA_SAVE_PATH, prefix, len, LocalTimeStr);
+    sprintf(filename, "%s%s_%u_%s.bin", TMP_SAVE_PATH, prefix, len, LocalTimeStr);
     Utils *utils = new Utils();
     utils->save_binary_file(filename, buf, 
         len,
@@ -819,6 +826,7 @@ void Host_Communication::download_spotoffset_data(CommandData_t* pCmdData, uint3
 {
     spot_offset_data_param_t* pWalkerrorParam;
     char msg[] = "Offset data loaded successfully.";
+    uint32_t dump_offsetdata_param_cnt = Utils::get_env_var_intvalue(ENV_VAR_DUMP_OFFSETDATA_PARAM_COUNT);
 
     if (rxDataLen < (sizeof(CommandData_t) + sizeof(spot_offset_data_param_t)))
     {
@@ -851,16 +859,28 @@ void Host_Communication::download_spotoffset_data(CommandData_t* pCmdData, uint3
         {
             save_data_2_bin_file("loaded_offset_data", loaded_spotoffset_data, loaded_spotoffset_data_size);
         }
+
+        if (dump_offsetdata_param_cnt > 0)
+        {
+            uint32_t i;
+            float* spodOffsetData = (float* ) loaded_spotoffset_data;
+            
+            DBG_PRINTK("First %d offset data of loaded_spotoffset_data, loaded_spotoffset_data_size: %d bytes\n", dump_offsetdata_param_cnt, loaded_spotoffset_data_size);
+            for (i = 0; i < dump_offsetdata_param_cnt; i++)
+            {
+                DBG_PRINTK("   loadedOffset[%4d] = %f\n", i,spodOffsetData[i]);
+            }
+        }
+
+        report_status(CMD_HOST_SIDE_DOWNLOAD_SPOT_OFFSET_DATA, CMD_DEVICE_SIDE_NO_ERROR, msg, strlen(msg));
     }
     else {
         char err_msg[128];
         sprintf(err_msg, "Invalid spotoffset_data_size(%d) for CMD_HOST_SIDE_DOWNLOAD_SPOT_OFFSET_DATA", pWalkerrorParam->offset_data_size);
         report_status(CMD_HOST_SIDE_DOWNLOAD_SPOT_OFFSET_DATA, CMD_DEVICE_SIDE_ERROR_INVALID_SPOTOFFSET_SIZE, err_msg, strlen(err_msg));
-        return;
     }
 
-
-    report_status(CMD_HOST_SIDE_DOWNLOAD_SPOT_OFFSET_DATA, CMD_DEVICE_SIDE_NO_ERROR, msg, strlen(msg));
+    return;
 }
 
 void Host_Communication::download_ref_distance_data(CommandData_t* pCmdData, uint32_t rxDataLen)
@@ -964,25 +984,25 @@ void Host_Communication::adaps_request_device_reboot(CommandData_t* pCmdData, ui
     }
 }
 
-void Host_Communication::adaps_set_module_kernel_type(CommandData_t* pCmdData, uint32_t rxDataLen)
+void Host_Communication::adaps_set_adaps_algo_model_type(CommandData_t* pCmdData, uint32_t rxDataLen)
 {
-    module_kernel_param_t* pKernelParam;
+    adaps_algo_model_type_t* pModelTypeParam;
 
-    if (rxDataLen < (sizeof(CommandData_t) + sizeof(module_kernel_param_t)))
+    if (rxDataLen < (sizeof(CommandData_t) + sizeof(adaps_algo_model_type_t)))
     {
-        LOG_ERROR("<%s>: rxDataLen %d is too short for CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE.\n", __FUNCTION__, rxDataLen);
+        LOG_ERROR("<%s>: rxDataLen %d is too short for CMD_HOST_SIDE_SET_ADAPS_ALGO_MODEL_TYPE.\n", __FUNCTION__, rxDataLen);
         return;
     }
 
-    pKernelParam = (module_kernel_param_t*) pCmdData->param;
-    if (pKernelParam->module_kernel_type < MODULE_KERNEL_TYPE_CNT)
+    pModelTypeParam = (adaps_algo_model_type_t*) pCmdData->param;
+    if (pModelTypeParam->adaps_algo_model_type < MODEL_TYPE_CNT)
     {
-        qApp->set_module_kernel_type(pKernelParam->module_kernel_type);
+        qApp->set_adaps_algo_model_type(pModelTypeParam->adaps_algo_model_type);
     }
     else {
         char err_msg[128];
-        sprintf(err_msg, "Invalid module_kernel_type(%d) for CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE", pKernelParam->module_kernel_type);
-        report_status(CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE, CMD_DEVICE_SIDE_ERROR_INVALID_MODULE_KERNEL_TYPE, err_msg, strlen(err_msg));
+        sprintf(err_msg, "Invalid adaps_algo_model_type(%d) for CMD_HOST_SIDE_SET_ADAPS_ALGO_MODEL_TYPE", pModelTypeParam->adaps_algo_model_type);
+        report_status(CMD_HOST_SIDE_SET_ADAPS_ALGO_MODEL_TYPE, CMD_DEVICE_SIDE_ERROR_INVALID_ADALGO_MODEL_TYPE, err_msg, strlen(err_msg));
         return;
     }
 }
@@ -1288,7 +1308,7 @@ void Host_Communication::adaps_event_process(void* pRXData, uint32_t rxDataLen)
     }
 
     CommandData_t* pCmdData = (CommandData_t*)pRXData;
-    LOG_DEBUG("adaps_event_process: cmd = 0x%x, rxDataLen %d.\n", pCmdData->cmd, rxDataLen);
+    LOG_DEBUG("rx_cmd = 0x%x, rxDataLen %d.\n", pCmdData->cmd, rxDataLen);
     switch (pCmdData->cmd)
     {
         case CMD_HOST_SIDE_SET_RTC_TIME:
@@ -1299,8 +1319,8 @@ void Host_Communication::adaps_event_process(void* pRXData, uint32_t rxDataLen)
             upload_module_static_data();
             break;
 
-        case CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE:
-            adaps_set_module_kernel_type(pCmdData, rxDataLen);
+        case CMD_HOST_SIDE_SET_ADAPS_ALGO_MODEL_TYPE:
+            adaps_set_adaps_algo_model_type(pCmdData, rxDataLen);
             break;
 
         case CMD_HOST_SIDE_SET_WALKERROR_ENABLE:

@@ -1,5 +1,6 @@
 #include <sys/sysmacros.h>
 #include <linux/v4l2-subdev.h>
+#include <string.h>
 
 #include "v4l2.h"
 #include "utils.h"
@@ -30,25 +31,23 @@ V4L2::V4L2(struct sensor_params params)
     init();
     memcpy(&snr_param, &params, sizeof(struct sensor_params));
 
-    if (NULL_POINTER != sensordata[params.work_mode].sensor_subdev)
-    {
-        memcpy(sensor_sd_name, sensordata[params.work_mode].sensor_subdev, DEV_NODE_LEN);
-    }
-    else {
-        memset(sensor_sd_name, 0, DEV_NODE_LEN);
-    }
+    strcpy(sensor_sd_name_keyword, KEYWORD_4_DTOF_SENSOR_SUBDEV_NAME);
     memcpy(media_dev, sensordata[params.work_mode].media_devnode, DEV_NODE_LEN);
     memcpy(video_dev, sensordata[params.work_mode].video_devnode, DEV_NODE_LEN);
     snr_param.raw_width = sensordata[params.work_mode].raw_w;
     snr_param.raw_height = sensordata[params.work_mode].raw_h;
     pixel_format = sensordata[params.work_mode].pixfmt;
-    frame_buffer_count = sensordata[params.work_mode].frm_buf_cnt;
+    frame_buffer_count = Utils::get_env_var_intvalue(ENV_VAR_FORCE_FRAME_BUFFER_COUNT);
+    if (0 == frame_buffer_count)
+    {
+        frame_buffer_count = sensordata[params.work_mode].frm_buf_cnt;
+    }
     snr_param.sensor_type = sensordata[params.work_mode].stype;
     frm_type = sensordata[params.work_mode].ftype;
     snr_param.out_frm_width = sensordata[params.work_mode].out_frm_width;
     snr_param.out_frm_height = sensordata[params.work_mode].out_frm_height;
 
-    DBG_INFO("sensor_sd_name: %s", sensor_sd_name);
+    DBG_INFO("sensor_sd_name_keyword: %s", sensor_sd_name_keyword);
     DBG_INFO("media_dev: %s", media_dev);
     DBG_INFO("video_dev: %s", video_dev);
     DBG_INFO("preset width: %d", snr_param.raw_width);
@@ -84,7 +83,6 @@ int V4L2::init()
     }
 
     sensordata[WK_DTOF_PHR] = {
-        ENTITY_NAME_4_DTOF_SENSOR,
         MEDIA_DEVNAME_4_DTOF_SENSOR,
         VIDEO_DEV_4_DTOF_SENSOR,
         1032,
@@ -98,7 +96,6 @@ int V4L2::init()
     };
 
     sensordata[WK_DTOF_PCM] = {
-        ENTITY_NAME_4_DTOF_SENSOR,
         MEDIA_DEVNAME_4_DTOF_SENSOR,
         VIDEO_DEV_4_DTOF_SENSOR,
         2560,
@@ -112,7 +109,6 @@ int V4L2::init()
     };
 
     sensordata[WK_DTOF_FHR] = {
-        ENTITY_NAME_4_DTOF_SENSOR,
         MEDIA_DEVNAME_4_DTOF_SENSOR,
         VIDEO_DEV_4_DTOF_SENSOR,
         4104,
@@ -126,7 +122,6 @@ int V4L2::init()
     };
 
     sensordata[WK_RGB_NV12] = {
-        NULL_POINTER,
         MEDIA_DEVNAME_4_RGB_SENSOR,
         VIDEO_DEV_4_RGB_RK3588,
         640,
@@ -140,7 +135,6 @@ int V4L2::init()
     };
 
     sensordata[WK_RGB_YUYV] = {
-        NULL_POINTER,
         MEDIA_DEVNAME_4_RGB_SENSOR,
         VIDEO_DEV_4_RGB_SENSOR,
         640,
@@ -214,6 +208,7 @@ int V4L2::get_subdev_node_4_sensor()
     int ret = -EINVAL;
     char cur_devnode[DEV_NODE_LEN];
     int fp;
+    void *result = NULL;
 
     fp = open(media_dev, O_RDWR);
     if (fp < 0)
@@ -223,7 +218,7 @@ int V4L2::get_subdev_node_4_sensor()
         return 0 - __LINE__;
     }
 
-    DBG_INFO("searching sensor %s...",sensor_sd_name);
+    DBG_INFO("searching sensor contains %s...", sensor_sd_name_keyword);
     DBG_INFO("enum entities...");
     DBG_INFO("major:minor   id      entity_name       device node");
     DBG_INFO("-------------------------------------------------------");
@@ -241,7 +236,8 @@ int V4L2::get_subdev_node_4_sensor()
         id = entity_desc.id;
         get_devnode_from_sysfs(&entity_desc,cur_devnode);
         DBG_INFO("   %2d:%2d      %2d    %16s   %s", entity_desc.v4l.major, entity_desc.v4l.minor, id,entity_desc.name,cur_devnode);
-        if(strcmp(sensor_sd_name, entity_desc.name) == 0)
+        result = strstr(entity_desc.name, sensor_sd_name_keyword);
+        if(NULL != result)
         {
 #if defined(RUN_ON_EMBEDDED_LINUX)
             strcpy(sd_devnode_4_dtof, cur_devnode);
@@ -293,7 +289,7 @@ bool V4L2::alloc_buffers(void)
         return false;
     }
 
-    buffers             = (struct buffer_s *) malloc(req_bufs.count * sizeof(struct buffer_s));
+    buffers = (struct buffer_s *) malloc(req_bufs.count * sizeof(struct buffer_s));
 
     if (!buffers) {
         DBG_ERROR("Out of memory");
@@ -401,7 +397,7 @@ int V4L2::V4l2_initilize(void)
         ret = get_subdev_node_4_sensor();
         if (ret < 0)
         {
-            DBG_ERROR("Fail to get subdev node for dtof sensor %s...", sensor_sd_name);
+            DBG_ERROR("Fail to get subdev node for dtof sensor %s...", sensor_sd_name_keyword);
             return 0 - __LINE__;
         }
 
@@ -457,6 +453,7 @@ int V4L2::V4l2_initilize(void)
     if (SENSOR_TYPE_DTOF == snr_param.sensor_type)
     {
         struct adaps_dtof_intial_param param;
+
         p_misc_device = qApp->get_misc_dev_instance();
         if (NULL_POINTER == p_misc_device)
         {
@@ -510,6 +507,7 @@ int V4L2::V4l2_initilize(void)
         }
 #endif
 
+        memset(&param, 0, sizeof(struct adaps_dtof_intial_param));
         param.env_type = snr_param.env_type;
         param.measure_type = snr_param.measure_type;
         param.framerate_type = snr_param.framerate_type;
@@ -828,14 +826,14 @@ int V4L2::Capture_frame()
     }
 
     if ((true == Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_PROCESS))            // if skip frame proceess with the environment variable
-#if defined(CONSOLE_APP_WITHOUT_GUI)
-        || (host_comm && FRAME_RAW_DATA == host_comm->get_req_out_data_type())  // or if host side only request raw data, skip frame decode process
+#if defined(CONSOLE_APP_WITHOUT_GUI)  // For SpadisQT_console, if host side only request raw data, and the environment variable 'force_frame_process' is not set, skip frame decode process
+        || ((host_comm && FRAME_RAW_DATA == host_comm->get_req_out_data_type()) && (false == Utils::is_env_var_true(ENV_VAR_FORCE_FRAME_PROCESS)))
 #endif
         )
     {
         if (1 == v4l2_buf.sequence % FRAME_INTERVAL_4_PROGRESS_REPORT)
         {
-            DBG_NOTICE("%s() mipi_rx_fps = %d fps, rxFrameCnt: %ld\n",  __FUNCTION__, mipi_rx_fps, rxFrameCnt);
+            DBG_NOTICE("%s() mipi_rx_fps = %d fps, rxFrameCnt: %ld, device side's frame process is being SKIPPED.\n",  __FUNCTION__, mipi_rx_fps, rxFrameCnt);
         }
 
     }

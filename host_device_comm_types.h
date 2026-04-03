@@ -7,7 +7,6 @@
 #define ERROR_MSG_MAX_LENGTH                    128
 #define PER_ROI_SRAM_MAX_SIZE                   512     //unit is bytes, actual use size is 480 bytes, the remaining 32 bytes is 0
 #define ZONE_COUNT_PER_SRAM_GROUP               4
-//#define MAX_CALIB_SRAM_ROLLING_GROUP_CNT        9
 #define SWIFT_PRODUCT_ID_SIZE                   12
 #define FW_VERSION_LENGTH                       12
 
@@ -45,7 +44,7 @@ typedef enum
     CMD_HOST_SIDE_DOWNLOAD_REF_DISTANCE_DATA        = 0x0011,
     CMD_HOST_SIDE_DOWNLOAD_LENS_INTRINSIC_DATA      = 0x0012,
     CMD_HOST_SIDE_SET_HISTOGRAM_DATA_REQ_POSITION   = 0x0013,
-    CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE            = 0x0014,  // for algo lib
+    CMD_HOST_SIDE_SET_ADAPS_ALGO_MODEL_TYPE         = 0x0014,  // for algo lib
 
     // from device side to PC side
     CMD_DEVICE_SIDE_UPLOAD_MODULE_STATIC_DATA       = 0x1000, // Device side sends the static_module data as requested by the client's CMD_HOST_SIDE_GET_MODULE_STATIC_DATA command
@@ -59,7 +58,7 @@ typedef enum
 #else
     CMD_HOST_SIDE_SET_RTC_TIME                      = 0x0001,
     CMD_HOST_SIDE_GET_MODULE_STATIC_DATA            = 0x0002, // Host PC side sends a command to get the calibration data from the EEPROM and otp
-    CMD_HOST_SIDE_SET_MODULE_KERNEL_TYPE            = 0x0003,  // for algo lib
+    CMD_HOST_SIDE_SET_ADAPS_ALGO_MODEL_TYPE         = 0x0003,  // for algo lib
     CMD_HOST_SIDE_SET_WALKERROR_ENABLE              = 0x0004,
     CMD_HOST_SIDE_SET_EXPOSURE_TIME                 = 0x0005,
     CMD_HOST_SIDE_SET_HISTOGRAM_DATA_REQ_POSITION   = 0x0006,  // optional
@@ -114,7 +113,10 @@ typedef enum
     CMD_DEVICE_SIDE_ERROR_INVALID_EEPROM_UPD_PARAM  = 0x000B,
     CMD_DEVICE_SIDE_ERROR_INVALID_REBOOT_REASON     = 0x000C,
     CMD_DEVICE_SIDE_ERROR_CHKSUM_MISMATCH_IN_EEPROM = 0x000D,
-    CMD_DEVICE_SIDE_ERROR_INVALID_MODULE_KERNEL_TYPE= 0x000E,
+    CMD_DEVICE_SIDE_ERROR_INVALID_ADALGO_MODEL_TYPE = 0x000E,
+    CMD_DEVICE_SIDE_ERROR_CAPTURE_FAILURE           = 0x000F,
+    CMD_DEVICE_SIDE_ERROR_CAPTURE_TIMEOUT           = 0x0010,
+    CMD_DEVICE_SIDE_ERROR_CAPTURE_BREAK             = 0x0011,
 } error_code_t;
 
 typedef enum
@@ -124,15 +126,15 @@ typedef enum
     CMD_HOST_SIDE_REBOOT_FOR_EEPROM_UPDATE_DONE     = 0x0001,
 } device_reboot_reason_t;
 
-typedef enum
-{
-    // from PC to device side
-    MODULE_KERNEL_TYPE_SPOT,
-    MODULE_KERNEL_TYPE_FLOOD,
-    MODULE_KERNEL_TYPE_CAMSENSE,
-    MODULE_KERNEL_TYPE_T,
-    MODULE_KERNEL_TYPE_CNT,
-} module_kernel_t;
+#if 0 // already define this type in depthmapwrapper.h
+typedef enum {
+    MODEL_TYPE_SPOT,
+    MODEL_TYPE_FLOOD,
+    MODEL_TYPE_CAMSENSE,
+    MODEL_TYPE_T,
+    MODEL_TYPE_CNT,
+} AdapsModelType;
+#endif
 
 #pragma pack(1)
 
@@ -316,10 +318,10 @@ typedef struct device_reboot_request_s
     CHAR                    reboot_reason_msg[ERROR_MSG_MAX_LENGTH];
 } device_reboot_request_t;
 
-typedef struct module_kernel_param_s
+typedef struct adaps_algo_model_type_s
 {
-    UINT8                   module_kernel_type;
-} module_kernel_param_t;
+    UINT8                   adaps_algo_model_type;
+} adaps_algo_model_type_t;
 
 #ifndef register_op_data_type
 #define register_op_data_type

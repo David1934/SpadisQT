@@ -22,7 +22,7 @@
 #include "misc_device.h"
 #include"utils.h"
 
-#define BUFFER_COUNT_4_DTOF_SENSOR              6
+#define BUFFER_COUNT_4_DTOF_SENSOR              12
 #define OUTPUT_WIDTH_4_DTOF_SENSOR              210
 #define OUTPUT_HEIGHT_4_DTOF_SENSOR             160
 
@@ -43,7 +43,6 @@ struct buffer_s
 
 struct sensor_data
 {
-    const char *sensor_subdev;
     const char *media_devnode;
     const char *video_devnode;
     int raw_w;
@@ -98,7 +97,7 @@ private:
     int total_bytes_per_line;
     int payload_bytes_per_line;
 
-    char        sensor_sd_name[DEV_NODE_LEN];
+    char        sensor_sd_name_keyword[16];
     char        media_dev[DEV_NODE_LEN];
     char        video_dev[DEV_NODE_LEN];
     struct sensor_params snr_param;

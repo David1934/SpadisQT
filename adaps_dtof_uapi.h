@@ -45,6 +45,7 @@ typedef enum {
 typedef enum {
     MIPI_DATA_LANES_4 = 4,             // data lane 0 -- 3
     MIPI_DATA_LANES_2 = 2,             // data lane 0 -- 1
+    MIPI_DATA_LANES_1 = 1,             // data lane 0
 }mipi_data_lane_t;
 
 typedef enum {
@@ -69,8 +70,13 @@ struct sys_perf_param {
 
 #if 1 //def __KERNEL__
 #if defined(CONFIG_VIDEO_ADS6311) || defined(CONFIG_VIDEO_ADS65XX) // FOR ADAPS_HAWK and CRANE
-
+#if defined(CONFIG_VIDEO_ADS6311)
 #define SENSOR_OTP_DATA_SIZE    0x20 // unit is word (16-bits)
+#endif
+
+#if defined(CONFIG_VIDEO_ADS65XX)
+#define SENSOR_OTP_DATA_SIZE    0x40 // unit is word (16-bits)
+#endif
 
 struct rkmodule_sensor_mode {
     char modename[RKMODULE_MODE_NAME_MAX];
@@ -196,6 +202,7 @@ enum sensor_otp_checksum_state{
     SENSOR_OTP_CHECKSUM_MISMATCHED,
 };
 
+#if defined(CONFIG_VIDEO_ADS6311)
 struct sensor_otp_temperature_param
 {
     __u8 chksum_state;              // refer to the enum sensor_otp_checksum_state
@@ -203,6 +210,18 @@ struct sensor_otp_temperature_param
     __u16 vbr_voltage;              // value x10 mv
     __u8 temperature;               // low temperature use signed 8-bit integer, while room and high temperature use unsigned temperature
 }__attribute__ ((packed));
+#endif
+
+#if defined(CONFIG_VIDEO_ADS65XX)
+struct sensor_otp_temperature_param
+{
+    __u8 chksum_state;              // refer to the enum sensor_otp_checksum_state
+    __u16 vbe_code1;
+    __u16 vbe_code2;
+    __u16 vbd_voltage;              // value x10 mv
+    __u8 temperature;               // low temperature use signed 8-bit integer, while room and high temperature use unsigned temperature
+}__attribute__ ((packed));
+#endif
 
 struct sensor_otp_key_data
 {
@@ -231,7 +250,7 @@ struct sensor_norflash_op_param
     __u32 len;
 }__attribute__ ((packed));
 
-struct hawk_sensor_cfg_data
+struct sensor_cfg_data
 {
     __u8 hVldSeg;
     __u8 vRollNum;
@@ -370,7 +389,7 @@ struct hawk_sensor_cfg_data
     _IOR('T', ADAPS_DTOF_PRIVATE + 44, struct sensor_otp_raw_data *)          // 0x2C
 
 #define ADTOF_SET_SENSOR_CFG_DATA       \
-    _IOW('T', ADAPS_DTOF_PRIVATE + 45, struct hawk_sensor_cfg_data *)          // 0x2D
+    _IOW('T', ADAPS_DTOF_PRIVATE + 45, struct sensor_cfg_data *)          // 0x2D
 #endif // FOR ADAPS_HAWK
 
 
@@ -379,6 +398,8 @@ struct hawk_sensor_cfg_data
 #if defined(CONFIG_VIDEO_ADS6401) || defined(CONFIG_VIDEO_PACIFIC) // FOR ADAPS_SWIFT
 
 #include "adaps_types.h"
+
+//#define ENABLE_UP_TO_80_SUBFRAMES_ROIROLLING_4_SWIFT
 
 #define FW_VERSION_LENGTH                   12
 
@@ -400,6 +421,12 @@ struct hawk_sensor_cfg_data
 #define ALL_ROISRAM_GROUP_SIZE              (PER_CALIB_SRAM_ZONE_SIZE * ZONE_COUNT_PER_SRAM_GROUP * CALIB_SRAM_GROUP_COUNT)
 
 #define SWIFT_MAX_SPOT_COUNT                (PER_ZONE_MAX_SPOT_COUNT * ZONE_COUNT_PER_SRAM_GROUP * CALIB_SRAM_GROUP_COUNT)
+
+#if defined(ENABLE_UP_TO_80_SUBFRAMES_ROIROLLING_4_SWIFT)
+    #define MAX_CALIB_SRAM_ROLLING_GROUP_CNT                    20  // The max zone count is up to 80 (20x4)
+#else
+    #define MAX_CALIB_SRAM_ROLLING_GROUP_CNT                    9   // The max zone count is up to 36 (9x4)
+#endif
 
 #define SWIFT_PRODUCT_ID_SIZE               12
 
@@ -453,7 +480,6 @@ enum {
 #define SPOT_MODULE_MODULE_INFO_RESERVED_SIZE           176
 #define SPOT_MODULE_WALKERROR_RESERVED_SIZE             5760
 
-#define SPOT_MODULE_EEPROM_CAPACITY_SIZE                (64*1024)  // 64*1024, unit is bytes
 #define SPOT_MODULE_EEPROM_PAGE_SIZE                    64
 
 #pragma pack(4)
@@ -576,7 +602,6 @@ typedef struct SwiftSpotModuleEepromData
 // -------------------- swift SMALL_FLOOD module definition start -------------
 
 // EEPROM-I2C--P24C256F-D4H-MIR
-#define FLOOD_MODULE_EEPROM_CAPACITY_SIZE                   (32*1024)  // 32*1024, unit is bytes
 #define FLOOD_MODULE_EEPROM_PAGE_SIZE                       64
 
 #define FLOOD_MODULE_SWIFT_OFFSET_SIZE                      1920  //960 * 2
@@ -704,14 +729,11 @@ typedef struct SwiftFloodModuleEepromData
 // -------------------- swift BIG_FOV FLOOD module definition start -------------
 
 
-#define MAX_CALIB_SRAM_ROLLING_GROUP_CNT                    9
-
 #define BIG_FOV_EEPROM_DATA_STRUCT_VERSION                  0x20251229
 #define BIG_FOV_EEPROM_MAGIC                                0xEEAD6401
 
 #define BIG_FOV_MODULE_SN_LENGTH                            32
-#define BIG_FOV_MAX_SPOT_ZONE_COUNT                         (ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROLLING_GROUP_CNT) // 36
-#define BIG_FOV_MODULE_EEPROM_CAPACITY_SIZE                 (128*1024)  // 128K, unit is bytes
+#define BIG_FOV_MAX_SPOT_ZONE_COUNT                         (ZONE_COUNT_PER_SRAM_GROUP * MAX_CALIB_SRAM_ROLLING_GROUP_CNT)
 #define BIG_FOV_MODULE_EEPROM_PAGE_SIZE                     256
 
 
@@ -720,7 +742,7 @@ typedef struct SwiftEepromV2Data
 {
     //HEAD
     uint32_t        magic_id;                               // 数据结构头魔术字，固定为十六进制值0xEEAD6401，用于识别是否ads6401模组的eeprom数据
-    uint32_t        data_structure_version;                 // eeprom数据结构的版本，格式为最后修改的日期（十六进制值），比如0x20251208
+    uint32_t        data_structure_version;                 // eeprom数据结构的版本，格式为最后修改的日期（十六进制值），比如0x20251229
     uint8_t         calibrationInfo[32];                    // 标定工具软件的版本号信息
     uint8_t         LastCalibratedTime[32];                 // 最后标定时间，比如：2025/11/27 14:59:04
     uint8_t         serialNumber[BIG_FOV_MODULE_SN_LENGTH]; // 模组序列号
@@ -795,7 +817,11 @@ typedef struct SwiftEepromV2Data
 #define  BIG_FOV_MODULE_EEPROM_SPOTOFFSET_MAX_SIZE                  MEMBER_SIZE(swift_eeprom_v2_data_t, spotOffset)
 
 // WARNING: This value should be an integer multiple of 4096 and greater than(>=) the EEPROM data size of all kinds of modules.
-#define MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA                    278528
+#if defined(ENABLE_UP_TO_80_SUBFRAMES_ROIROLLING_4_SWIFT)
+    #define MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA                618496  // when MAX_CALIB_SRAM_ROLLING_GROUP_CNT == 20
+#else
+    #define MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA                278528  // when MAX_CALIB_SRAM_ROLLING_GROUP_CNT == 9
+#endif
 
 
 #define  BIG_FOV_MODULE_EEPROM_BASICDATA_OFFSET                     OFFSET(swift_eeprom_v2_data_t, real_spot_zone_count)

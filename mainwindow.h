@@ -50,12 +50,13 @@ private slots:
         void onCtrl_X_Pressed(void);
     #endif
     void Quit(void);
+    void onFrameRxErrorHandle(int err_reason);
     void onThreadEnd(int stop_request_code);
     void unixSignalHandler(int signal);
     void on_startCapture();
     void on_stopCapture();
 #if defined(RUN_ON_EMBEDDED_LINUX) && !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
-    void on_capture_options_set(capture_req_param_t* param);
+    void on_captureOptionsSet(capture_req_param_t* param);
 #endif
 
 private:

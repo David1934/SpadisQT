@@ -16,7 +16,10 @@
 
 static MainWindow* mainWindow = nullptr;
 
-static void dump_stack()
+#if defined(BUILD_4_RELEASE)
+static 
+#endif
+void dump_stack()
 {
     const int len = 1024;
     void *func[len];
@@ -38,7 +41,10 @@ static void dump_stack()
     free(funs);
 }
 
-static void handleSignal(int signal)
+#if defined(BUILD_4_RELEASE)
+static 
+#endif
+void handleSignal(int signal)
 {
     if (mainWindow) {
         switch (signal) {
@@ -167,7 +173,7 @@ int main(int argc, char *argv[])
 #endif
 
     result = a.exec();
-    DBG_INFO("Application exited with code:: %d", result);
+    DBG_INFO("Application exited with code: %d", result);
 
     return result;
 }

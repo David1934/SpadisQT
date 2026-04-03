@@ -7,6 +7,8 @@
 
 FrameProcessThread::FrameProcessThread()
 {
+    int t;
+
     stopped = true;
     majorindex = -1;
     rgb_buffer = NULL_POINTER;
@@ -16,6 +18,20 @@ FrameProcessThread::FrameProcessThread()
 #if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6) && defined(ENABLE_POINTCLOUD_OUTPUT)
     out_pcloud_buffer = NULL_POINTER;
 #endif
+
+    hist_count_to_get = GET_HISTOGRAM_COUNT;
+    t = Utils::get_env_var_intvalue(ENV_VAR_FORCE_GET_HISTOGRAM_COUNT);
+    if (0 != t)
+    {
+        hist_count_to_get = t;
+        DBG_INFO("force_get_histogram_count %d...", t);
+    }
+    if (hist_count_to_get > (MAX_SRAM_DATA_NUMBERS *ZONE_SIZE * SWIFT_SPOT_COUNTS_PER_ZONE))
+    {
+        DBG_ERROR("hist_count_to_get (%d) is too big, please double check it!!!", hist_count_to_get);
+        return;
+    }
+    rawHist = NULL_POINTER;
 #endif
 
     outputed_frame_cnt = 0;
@@ -26,7 +42,11 @@ FrameProcessThread::FrameProcessThread()
     sns_param.to_dump_frame_cnt = qApp->get_save_cnt();
     skip_frame_decode = Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_DECODE);
     dump_spot_statistics_times = Utils::get_env_var_intvalue(ENV_VAR_DUMP_SPOT_STATISTICS_TIMES);
-    dump_ptm_frame_headinfo_times = Utils::get_env_var_intvalue(ENV_VAR_DUMP_PTM_FRAME_HEADINFO_TIMES);
+    poll_timeout_ms = Utils::get_env_var_intvalue(ENV_VAR_FORCE_POLL_TIMEOUT);
+    if (0 == poll_timeout_ms)
+    {
+        poll_timeout_ms = DEFAULT_POLL_TIMEOUT_MS;
+    }
 
 #if defined(RUN_ON_EMBEDDED_LINUX)
     if (SENSOR_TYPE_DTOF == sns_param.sensor_type)
@@ -97,6 +117,12 @@ FrameProcessThread::~FrameProcessThread()
         depth_buffer = NULL_POINTER;
     }
 
+    if (NULL_POINTER != rawHist)
+    {
+        free(rawHist);
+        rawHist = NULL_POINTER;
+    }
+
 #if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 5, 6) && defined(ENABLE_POINTCLOUD_OUTPUT)
     if (NULL_POINTER != out_pcloud_buffer)
     {
@@ -129,7 +155,8 @@ bool FrameProcessThread::save_frame(unsigned int frm_sequence, void *frm_buf, in
                                     ".raw_depth",
                                     ".decoded_grayscale",
                                     ".decoded_depth16",
-                                    ".decoded_point_cloud"
+                                    ".decoded_point_cloud",
+                                    ".decoded_raw_hist"
                                 };
 
     Q_UNUSED(frm_timestamp);
@@ -139,7 +166,7 @@ bool FrameProcessThread::save_frame(unsigned int frm_sequence, void *frm_buf, in
     char *          LocalTimeStr = (char *) currentTime.toStdString().c_str();
     char *          filename = new char[128];
 
-    sprintf(filename, "%sframe%03d_%dx%d_%s_%d%s", DATA_SAVE_PATH, frm_sequence, frm_w, frm_h,LocalTimeStr, buf_size, extName[ftype]);
+    sprintf(filename, "%sframe%03d_%dx%d_%s_%d%s", TMP_SAVE_PATH, frm_sequence, frm_w, frm_h,LocalTimeStr, buf_size, extName[ftype]);
     utils->save_binary_file(filename, frm_buf, 
         buf_size,
         __FUNCTION__,
@@ -189,6 +216,7 @@ bool FrameProcessThread::new_frame_handle(
 #if defined(RUN_ON_EMBEDDED_LINUX)
     static int run_times = 0;
 #endif
+    int hist_count = 0;
 
     Q_UNUSED(frm_sequence);
     Q_UNUSED(frm_timestamp);
@@ -212,7 +240,7 @@ bool FrameProcessThread::new_frame_handle(
                     }
                 }
 
-                decodeRet = adaps_dtof->dtof_frame_decode(frm_sequence, (unsigned char *)frm_rawdata, buf_len, depth_buffer, NULL_POINTER, sns_param.work_mode);
+                decodeRet = adaps_dtof->dtof_frame_decode(sns_param.work_mode, frm_sequence, (unsigned char *)frm_rawdata, buf_len, depth_buffer, NULL_POINTER, NULL_POINTER, &hist_count);
                 if (0 == decodeRet)
                 {
 #if !defined(STANDALONE_APP_WITHOUT_HOST_COMMUNICATION)
@@ -263,11 +291,6 @@ bool FrameProcessThread::new_frame_handle(
         case FDATA_TYPE_DTOF_RAW_DEPTH:
             if (adaps_dtof)
             {
-                if (frm_sequence < dump_ptm_frame_headinfo_times && 0 != dump_ptm_frame_headinfo_times)
-                {
-                    adaps_dtof->dump_frame_headinfo(frm_sequence, (unsigned char *)frm_rawdata, buf_len, sns_param.work_mode);
-                }
-
                 if (NULL_POINTER != expected_md5_string)
                 {
                     // swift test pattern output, the first 2 lines/packets have some variable values, so I'm ignoring them.
@@ -305,7 +328,9 @@ bool FrameProcessThread::new_frame_handle(
                     }
                 }
 
+                hist_count = hist_count_to_get;
                 decodeRet = adaps_dtof->dtof_frame_decode(
+                    sns_param.work_mode,
                     frm_sequence,
                     (unsigned char *)frm_rawdata,
                     buf_len,
@@ -315,7 +340,9 @@ bool FrameProcessThread::new_frame_handle(
 #else
                     NULL_POINTER,
 #endif
-                    sns_param.work_mode);
+                    rawHist,
+                    &hist_count
+                    );
 
                 if (0 == decodeRet)
                 {
@@ -384,6 +411,22 @@ bool FrameProcessThread::new_frame_handle(
                             {
                                 utils->save_depth_txt_file(depth_buffer, frm_sequence, depth_buffer_size, sns_param.out_frm_width, sns_param.out_frm_height);
                             }
+
+#if defined(ENABLE_HISTOGRAM_RAW_OUTPUT)
+                            if (hist_count_to_get > 0)
+                            {
+                                DBG_NOTICE("Request %d, real get %d histogram data for frame %d, rawHist_buffer_size: %d, sizeof(OUT_HISTOGRAM_TYPE): %ld, OUT_HISTOGRAM_LEN: %d\n",
+                                    hist_count_to_get, hist_count, frm_sequence, rawHist_buffer_size, sizeof(OUT_HISTOGRAM_TYPE), OUT_HISTOGRAM_LEN);
+
+                                if ((true == Utils::is_env_var_true(ENV_VAR_SAVE_FRAME_HIST_DATA_ENABLE)) && (NULL_POINTER != rawHist))
+                                {
+                                    save_frame(frm_sequence, (void *) rawHist, rawHist_buffer_size,
+                                        sns_param.out_frm_width, sns_param.out_frm_height,
+                                        frm_timestamp, FDATA_TYPE_DTOF_RAW_HISTOGRAM);
+                                }
+                            }
+#endif
+
                         }
 #if !defined(CONSOLE_APP_WITHOUT_GUI)
                         adaps_dtof->ConvertDepthToColoredMap(depth_buffer, rgb_buffer, confidence_map_buffer, sns_param.out_frm_width, sns_param.out_frm_height);
@@ -506,6 +549,12 @@ void FrameProcessThread::onThreadLoopExit()
             free(confidence_map_buffer);
             confidence_map_buffer = NULL_POINTER;
         }
+
+        if (NULL_POINTER != rawHist)
+        {
+            free(rawHist);
+            rawHist = NULL_POINTER;
+        }
 #endif
     }
     if (NULL_POINTER != rgb_buffer)
@@ -589,6 +638,17 @@ int FrameProcessThread::init(int index)
                 }
 #endif
 
+#if defined(ENABLE_HISTOGRAM_RAW_OUTPUT)
+                if (hist_count_to_get > 0)
+                {
+                    rawHist_buffer_size = hist_count_to_get * sizeof(struct SpotHistogram);
+                    rawHist = (struct SpotHistogram *)malloc(rawHist_buffer_size);
+                    if (NULL_POINTER != rawHist)
+                    {
+                        memset(rawHist, 0, rawHist_buffer_size);
+                    }
+                }
+#endif
             }
             confidence_map_buffer = (unsigned char *)malloc(sizeof(unsigned char)*sns_param.out_frm_width*sns_param.out_frm_height*RGB_IMAGE_CHANEL);
             memset(confidence_map_buffer, 0, sns_param.out_frm_width*sns_param.out_frm_height*RGB_IMAGE_CHANEL);
@@ -628,16 +688,28 @@ void FrameProcessThread::run()
                 ///     utils->GetPidTid(__FUNCTION__, __LINE__);
                 /// }
 
-                 ret = poll(fds, 1, POLL_TIMEOUT); // 超时100ms
+                 ret = poll(fds, 1, poll_timeout_ms);
                  if (ret <= 0) {
                      if (ret < 0)
                      {
-                         qWarning() << "poll error:" << strerror(errno);
+                         DBG_ERROR("Poll error for video device, errno: %s (%d)...", strerror(errno), errno);
+                         emit frame_rx_error(FRAME_RX_ERROR_POLL);
+                         stop(STOP_REQUEST_QUIT);
                          break;
                      }
+                     else if (0 == ret)
+                     {
+                         DBG_ERROR("Poll timeout (%d ms) for video device...", poll_timeout_ms);
+                         emit frame_rx_error(FRAME_RX_ERROR_TIMEOUT);
+                         stop(STOP_REQUEST_QUIT);
+                         break;
+                     }
+
                      if (stopped)
                      {
-                        stop(STOP_REQUEST_STOP);
+                        DBG_ERROR("streaming is break...");
+                        emit frame_rx_error(FRAME_RX_ERROR_USER_BREAK);
+                        stop(STOP_REQUEST_QUIT);
                         break; // 被信号中断，且需要退出
                      }
 

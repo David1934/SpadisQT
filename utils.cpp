@@ -125,7 +125,7 @@ void Utils::save_depth_txt_file(void *frm_buf,unsigned int frm_sequence,int frm_
     char path[50]={0};
     int16_t *p_temp=(int16_t*)frm_buf;
 
-    sprintf(path,"%sframe%03d_%s_%d_depth%s",DATA_SAVE_PATH,frm_sequence, LocalTimeStr, frm_len, ".txt");
+    sprintf(path,"%sframe%03d_%s_%d_depth%s", TMP_SAVE_PATH, frm_sequence, LocalTimeStr, frm_len, ".txt");
     FILE*fp = NULL_POINTER;
     fp=fopen(path, "w+");
     if (fp == NULL_POINTER)
@@ -155,7 +155,7 @@ bool Utils::save_dtof_eeprom_calib_data_2_file(void *buf, int len)
     char *          LocalTimeStr = (char *) currentTime.toStdString().c_str();
     char *          filename = new char[50];
 
-    sprintf(filename, "%s%s.eeprom",DATA_SAVE_PATH,LocalTimeStr);
+    sprintf(filename, "%s%s.eeprom", TMP_SAVE_PATH, LocalTimeStr);
     Utils *utils = new Utils();
     utils->save_binary_file(filename, buf, 
         len,
@@ -538,8 +538,8 @@ int Utils::MD5Calculate(const unsigned char* buffer, int size, const char *call_
         if (frm_sequence < 4)
         {
             char filename[50];
-            
-            sprintf(filename, "%s%s.depth16", DATA_SAVE_PATH, calced_md5_string);
+
+            sprintf(filename, "%s%s.depth16", TMP_SAVE_PATH, calced_md5_string);
             save_binary_file(filename, buffer, size, __FUNCTION__, __LINE__);
         }
     }

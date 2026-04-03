@@ -8,20 +8,22 @@
 
 #define VERSION_MAJOR                           3
 #define VERSION_MINOR                           6
-#define VERSION_REVISION                        0
-#define LAST_MODIFIED_TIME                      "20260106A"
+#define VERSION_REVISION                        7
+#define LAST_MODIFIED_TIME                      "20260402A"
 
 #define DEFAULT_DTOF_FRAMERATE                  AdapsFramerateType30FPS // AdapsFramerateType60FPS
 
-#define DEPTH_LIB_DATA_DUMP_PATH                "./OfflineData/"
+#define DEPTH_LIB_DATA_DUMP_PATH                "/tmp/OfflineData/"
 #define DEPTH_LIB_CONFIG_PATH                   "/vendor/etc/camera/adapsdepthsettings.xml"
-#define DATA_SAVE_PATH                          "/tmp/" // "/sdcard/"
+#define TMP_SAVE_PATH                           "/tmp/"
 #define DEFAULT_SAVE_FRAME_CNT                  0
 #define RTCTIME_DISPLAY_FMT                     "hh:mm:ss"  // "yyyy/MM/dd hh:mm:ss"
 #define FRAME_PROCESS_THREAD_INTERVAL_US        10   // unit is us
 
 // query the video node by the command 'v4l2-ctl --list-devices' or 'media-ctl -p -d /dev/media0'
 
+#define SPAD_ROW_SEARCHING_RANGE                2
+#define SPAD_COL_SEARCHING_RANGE                2
 
 #define PIXELFORMAT_4_DTOF_SENSOR               V4L2_PIX_FMT_SBGGR8
 
@@ -30,16 +32,16 @@
 #define VIDEO_DEV_4_RGB_RK3588                  "/dev/video55"
 #define VIDEO_DEV_4_MISC_DEVICE                 "/dev/ads6401"
 
+#define KEYWORD_4_DTOF_SENSOR_SUBDEV_NAME       "ads6401"
+
 #if defined(RUN_ON_RK3568)
     // for rk3568
     #define MEDIA_DEVNAME_4_DTOF_SENSOR             "/dev/media0"
     #define VIDEO_DEV_4_DTOF_SENSOR                 "/dev/video0"
-    #define ENTITY_NAME_4_DTOF_SENSOR               "m00_b_ads6401 4-005e"
 #else
     // for rk3588
     #define MEDIA_DEVNAME_4_DTOF_SENSOR             "/dev/media2"
     #define VIDEO_DEV_4_DTOF_SENSOR                 "/dev/video22"
-    #define ENTITY_NAME_4_DTOF_SENSOR               "m00_b_ads6401 7-005e"
     #define VIDIOC_S_FMT_INCLUDE_VIDIOC_SUBDEV_S_FMT    // On rk3588 Linux platform, when call ioctl(fd, VIDIOC_S_FMT, &fmt), it will set format for sensor too.
 #endif
 
@@ -48,7 +50,10 @@
 #define FRAME_INTERVAL_4_PROGRESS_REPORT        500   // every X frames, report a progress
 
 #define WAIT_TIME_4_THREAD_EXIT                 10  // unit is  milliseconds
-#define POLL_TIMEOUT                            100  // unit is  milliseconds
+#define DEFAULT_POLL_TIMEOUT_MS                 (5*1000)  // unit is  milliseconds
+
+#define FPS_THRESHOLD_TO_WARNING                10.0
+#define FPS_REPORT_INTERVAL                     60      // unit is second
 
 #if defined(RUN_ON_EMBEDDED_LINUX)
     #define DEFAULT_SENSOR_TYPE                 SENSOR_TYPE_DTOF
@@ -72,6 +77,7 @@
 #define ENV_VAR_SAVE_FRAME_RAW_DATA_ENABLE      "save_frame_raw_data_enable"
 #define ENV_VAR_SAVE_FRAME_DEPTH16_ENABLE       "save_frame_depth16_enable"
 #define ENV_VAR_SAVE_FRAME_POINTCLOUD_ENABLE    "save_frame_pointcloud_enable"
+#define ENV_VAR_SAVE_FRAME_HIST_DATA_ENABLE     "save_frame_histogram_data_enable"
 #define ENV_VAR_SKIP_FRAME_DECODE               "skip_frame_decode"
 #define ENV_VAR_SKIP_FRAME_PROCESS              "skip_frame_process"
 #define ENV_VAR_ENABLE_EXPAND_PIXEL             "enable_expand_pixel"      // processed in adaps decode algo lib
@@ -96,10 +102,15 @@
 #define ENV_VAR_FORCE_LASEREXPOSUREPERIOD       "force_laserExposurePeriod"
 #define ENV_VAR_FORCE_FRAMERATE_FPS             "force_framerate_fps"
 #define ENV_VAR_FORCE_ROI_SRAM_SIZE             "force_roi_sram_size"
+#define ENV_VAR_FORCE_POLL_TIMEOUT              "force_poll_timeout"
+#define ENV_VAR_FORCE_FRAME_PROCESS             "force_frame_process"
+#define ENV_VAR_FORCE_FRAME_BUFFER_COUNT        "force_frame_buffer_count"
+#define ENV_VAR_FORCE_GET_HISTOGRAM_COUNT       "force_get_histogram_count"
 
 #define ENV_VAR_DBGINFO_ENABLE                  "debug_info_enable"
 #define ENV_VAR_TRACE_ROI_SRAM_SWITCH           "trace_roi_sram_switch"
 #define ENV_VAR_TRACE_ALGO_LIB_DECODE_COSTTIME  "trace_algo_lib_decode_costtime"
+#define ENV_VAR_TRACE_OUTPUT_FRAME_RATE         "trace_output_frame_rate"
 
 #define ENV_VAR_DUMP_LENS_INTRINSIC             "dump_lens_intrinsic"
 #define ENV_VAR_DUMP_ROI_SRAM_SIZE              "dump_roi_sram_size"
@@ -110,7 +121,6 @@
 #define ENV_VAR_DUMP_MID_CONF_ENABLE            "dump_medium_confidence_spot"
 #define ENV_VAR_DUMP_MODULE_STATIC_DATA         "dump_module_static_data"
 #define ENV_VAR_DUMP_PARSING_SCRIPT_ITEMS       "dump_parsing_script_items"
-#define ENV_VAR_DUMP_SPOTS_ITVL_BY_CONFIDENCE   "dump_spots_interval_by_confidence" // every X frame print once, 0 means no print
 #define ENV_VAR_DUMP_SPOT_STATISTICS_TIMES      "dump_spot_statistics_times"
 #define ENV_VAR_DUMP_PTM_FRAME_HEADINFO_TIMES   "dump_ptm_frame_headinfo_times"
 #define ENV_VAR_DUMP_WALKERROR_PARAM_COUNT      "dump_walkerror_param_count"
@@ -224,6 +234,13 @@ typedef unsigned int u32;
 typedef unsigned long long u64;
 typedef unsigned int moduletype;
 
+enum frame_rx_err_type{
+    FRAME_RX_ERROR_OK,
+    FRAME_RX_ERROR_TIMEOUT,
+    FRAME_RX_ERROR_POLL,
+    FRAME_RX_ERROR_USER_BREAK,
+};
+
 enum stop_request_code{
     STOP_REQUEST_RGB,
     STOP_REQUEST_PHR,
@@ -248,6 +265,7 @@ enum frame_data_type{
     FDATA_TYPE_DTOF_DECODED_GRAYSCALE,
     FDATA_TYPE_DTOF_DECODED_DEPTH16,
     FDATA_TYPE_DTOF_DECODED_POINT_CLOUD,
+    FDATA_TYPE_DTOF_RAW_HISTOGRAM,
     FDATA_TYPE_COUNT
 };
 

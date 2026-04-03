@@ -2,8 +2,8 @@
 #define __DEPTHMAP_WRAPPER_H__
 
 #define ALGO_LIB_VERSION_MAJOR                           3
-#define ALGO_LIB_VERSION_MINOR                           7
-#define ALGO_LIB_VERSION_REVISION                        7
+#define ALGO_LIB_VERSION_MINOR                           8
+#define ALGO_LIB_VERSION_REVISION                        5
 
 #define VERSION_HEX_VALUE(major, minor, revision)        (major << 16 | minor << 8 | revision)
 
@@ -24,13 +24,29 @@
 #if defined(ENABLE_COMPATIABLE_WITH_OLD_ALGO_LIB) // the old algo lib 3.3.2, which supports Android.
 #define MAX_SRAM_DATA_NUMBERS      1
 #else
-#define MAX_SRAM_DATA_NUMBERS      9
+#define MAX_SRAM_DATA_NUMBERS      MAX_CALIB_SRAM_ROLLING_GROUP_CNT
 #endif
+
+// PAY ATTENTION: when MAX_SRAM_DATA_NUMBERS=9, outAllPointsPtr[9][4][240] of WrapperDepthOutput will need 25M+ bytes RAM, 
+// please ensure RAM is enough, otherwize please comment out the build option.
+//#define ENABLE_HISTOGRAM_RAW_OUTPUT
+#define GET_HISTOGRAM_COUNT                     (240 * 4 * 4)   // should <= (240 * 4 * 9), 240 spots per zone, 4 zones per image-frame, 9 image-frame per group, 0 mean no request histogram output.
+
+
+
+
 
 #define ADAPS_SPARSE_POINT_POSITION_DATA_SIZE   960
 #define AdapsAlgoLibVersionLength               32
 #define ZONE_SIZE                               (4)
 #define SWIFT_SPOT_COUNTS_PER_ZONE              (240)
+
+#define FHR_FULL_DISTANCE_HIST_LENGTH           768 // NEED to keep match with swift algo lib
+#define FHR_HIST_LENGTH                         512 // NEED to keep match with swift algo lib
+#define FHR_COMBINED_HIST_LENGTH                384 // NEED to keep match with swift algo lib
+
+#define OUT_HISTOGRAM_LEN                       384     // 512, 实际输出大小是384
+#define OUT_HISTOGRAM_TYPE                      uint16_t // uint16_t
 
 struct AdapsSparsePointPositionData
 {
@@ -51,11 +67,27 @@ struct SpotPoint {
     uint16_t y;
     uint8_t  zoneId;     // the zone of spot belong to  
     uint8_t  indexInZone;// index in the zone
-
-    uint16_t histRaw[768];
-    uint32_t histConved[768];
-
+    uint16_t rawHistMaxValue;
+#if defined(WINDOWS_BUILD) || defined(ENABLE_HISTOGRAM_RAW_OUTPUT)  // NEED to keep match with swift algo lib
+    uint16_t histRaw[FHR_FULL_DISTANCE_HIST_LENGTH];                // binning histogram, max value may be great than 255
+    uint16_t histRawUnBinning[FHR_FULL_DISTANCE_HIST_LENGTH];       // unbinning historgram, max value is 252, real length is FHR_HIST_LENGTH(512)
+#endif
 };
+
+struct SpotHistogram {
+    uint8_t x;  // 8 bits is enough, since the outout resolution of swift is 210 x 160
+    uint8_t y;
+
+    OUT_HISTOGRAM_TYPE rawHistogram[OUT_HISTOGRAM_LEN];
+};
+
+typedef enum {
+    MODEL_TYPE_SPOT,
+    MODEL_TYPE_FLOOD,
+    MODEL_TYPE_CAMSENSE,
+    MODEL_TYPE_T,
+    MODEL_TYPE_CNT,
+} AdapsModelType;
 
 typedef enum {
     WRAPPER_CAM_FORMAT_NONE,
@@ -95,7 +127,7 @@ typedef struct {
 } FocusRoi;
 
 typedef struct CircleForMask {
-    float CircleMaskR;
+    int   CircleMaskR;
     int   CircleMaskCenterX;
     int   CircleMaskCenterY;
 }CircleForMask;
@@ -136,6 +168,10 @@ typedef struct {
     WrapperDepthCamFpsRange in_depth_map_fps_range;
     AdapsParamAndOutForProcessEveryFrame frame_parameters;
 } WrapperDepthCamConfig;
+
+#if (GET_HISTOGRAM_COUNT > (MAX_SRAM_DATA_NUMBERS *ZONE_SIZE * SWIFT_SPOT_COUNTS_PER_ZONE))
+    #error "GET_HISTOGRAM_COUNT is too big, please double check its definition !!!"
+#endif
 
 typedef struct {
     WrapperDepthFormat format;
@@ -222,7 +258,7 @@ typedef struct {
 #endif
 
 #if ALGO_LIB_VERSION_CODE >= VERSION_HEX_VALUE(3, 6, 5)
-    int moduleKernelType;
+    int adapsAlgoModelType;   // refer to the defintion AdapsModelType
 #endif
 } SetWrapperParam;
 
@@ -275,6 +311,9 @@ void DepthMapWrapperGetVersion(char* version);
 
 CP_DLL_PUBLIC
 void DepthMapWrapperSetCircleMask(void* pDepthMapWrapper, CircleForMask circleForMask);
+
+CP_DLL_PUBLIC
+void DepthMapWrapperGetDataInfo(void* pDepthMapWrapper, uint32_t* sramId, uint32_t* zoneId);
 
 
 #ifdef __cplusplus

@@ -678,6 +678,8 @@ int Misc_Device::read_dtof_module_static_data(void)
         ret = -1;
     }
     else {
+        DBG_NOTICE("MAX_CALIB_SRAM_ROLLING_GROUP_CNT is configured to %d, MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA: %d",
+            MAX_CALIB_SRAM_ROLLING_GROUP_CNT, MMAP_BUFFER_MAX_SIZE_4_WHOLE_EEPROM_DATA);
         DBG_NOTICE("module_type: 0x%x, ready: %d", module_static_data.module_type, module_static_data.ready);
         if (module_static_data.ready)
         {
