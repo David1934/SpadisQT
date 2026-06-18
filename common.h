@@ -8,8 +8,8 @@
 
 #define VERSION_MAJOR                           3
 #define VERSION_MINOR                           6
-#define VERSION_REVISION                        7
-#define LAST_MODIFIED_TIME                      "20260402A"
+#define VERSION_REVISION                        9
+#define LAST_MODIFIED_TIME                      "20260605A"
 
 #define DEFAULT_DTOF_FRAMERATE                  AdapsFramerateType30FPS // AdapsFramerateType60FPS
 
@@ -49,8 +49,10 @@
 #define TIMER_TEST_INTERVAL                     5   // unit is second
 #define FRAME_INTERVAL_4_PROGRESS_REPORT        500   // every X frames, report a progress
 
+#define FRAME_COUNT_TO_READ_TEMPERATURE         10   // every X frames, call read_dtof_runtime_status_param() to get the current temperature and voltage.
+
 #define WAIT_TIME_4_THREAD_EXIT                 10  // unit is  milliseconds
-#define DEFAULT_POLL_TIMEOUT_MS                 (5*1000)  // unit is  milliseconds
+#define DEFAULT_POLL_TIMEOUT_MS                 (-1) // (5*1000)  // unit is  milliseconds
 
 #define FPS_THRESHOLD_TO_WARNING                10.0
 #define FPS_REPORT_INTERVAL                     60      // unit is second
@@ -90,7 +92,6 @@
 #define ENV_VAR_ROI_SRAM_COORDINATES_CHECK      "roi_sram_coordinates_check"
 #define ENV_VAR_RAW_FILE_REPLAY_ENABLE          "raw_file_replay_enable"
 #define ENV_VAR_DEPTH16_FILE_REPLAY_ENABLE      "depth16_file_replay_enable"
-#define ENV_VAR_FRAME_DROP_CHECK_ENABLE         "frame_drop_check_enable"
 #define ENV_VAR_SAVE_LOADED_DATA_ENABLE         "save_loaded_data_enable"
 #define ENV_VAR_BUFFER_FULLY_ZERO_CHECK         "buffer_fully_zero_check"
 

@@ -635,6 +635,7 @@ int V4L2::Start_streaming(void)
     if (SENSOR_TYPE_DTOF == snr_param.sensor_type)
     {
         struct adaps_dtof_exposure_param *p_exposure_param;
+        struct adaps_dtof_runtime_status_param *p_runtime_status_param;
 
         p_misc_device = qApp->get_misc_dev_instance();
         if (NULL_POINTER == p_misc_device)
@@ -658,6 +659,8 @@ int V4L2::Start_streaming(void)
         snr_param.exposureParam.ptm_coarse_exposure_value = p_exposure_param->ptm_coarse_exposure_value;
         snr_param.exposureParam.ptm_fine_exposure_value = p_exposure_param->ptm_fine_exposure_value;
         snr_param.exposureParam.pcm_gray_exposure_value = p_exposure_param->pcm_gray_exposure_value;
+
+        p_misc_device->read_dtof_runtime_status_param(&p_runtime_status_param); // first read temperature/pvdd/vop value before Capture_frame() to avoid frame-drop when Capture_frame the first frame.
     }
 #endif
 
@@ -741,8 +744,8 @@ int V4L2::Capture_frame()
         payload_bytes_per_line = (snr_param.raw_width * bits_per_pixel)/8;
         padding_bytes_per_line = total_bytes_per_line - payload_bytes_per_line;
 #if defined(RUN_ON_EMBEDDED_LINUX)
-        DBG_NOTICE("------script_loaded: %d, workmode: %d, frame raw size: %d X %d, bits_per_pixel: %d, payload_bytes_per_line: %d, total_bytes_per_line: %d, padding_bytes_per_line: %d, frame_buffer_size: %d---\n",
-            script_loaded, snr_param.work_mode,
+        DBG_NOTICE("------script_loaded: %d, workmode: %d, frame_sequence: %d, frame raw size: %d X %d, bits_per_pixel: %d, payload_bytes_per_line: %d, total_bytes_per_line: %d, padding_bytes_per_line: %d, frame_buffer_size: %d---\n",
+            script_loaded, snr_param.work_mode, v4l2_buf.sequence,
             snr_param.raw_width, snr_param.raw_height,
             bits_per_pixel, payload_bytes_per_line, total_bytes_per_line, padding_bytes_per_line, bytesused);
 #else
@@ -767,7 +770,13 @@ int V4L2::Capture_frame()
         return -1;
     }
 
-    p_misc_device->read_dtof_runtime_status_param(&p_runtime_status_param);
+    if ((0 != v4l2_buf.sequence) && (0 == (v4l2_buf.sequence % FRAME_COUNT_TO_READ_TEMPERATURE)))
+    {
+        p_misc_device->read_dtof_runtime_status_param(&p_runtime_status_param);
+    }
+    else {
+        p_runtime_status_param = (struct adaps_dtof_runtime_status_param *) p_misc_device->get_dtof_runtime_status_param();
+    }
     param1.curr_temperature = p_runtime_status_param->inside_temperature_x100;
     param1.curr_exp_vop_abs = p_runtime_status_param->expected_vop_abs_x100;
     param1.curr_exp_pvdd = p_runtime_status_param->expected_pvdd_x100;

@@ -19,24 +19,38 @@ ADAPS_DTOF::ADAPS_DTOF(struct sensor_params params)
     m_rangeHigh = COLOR_MAP_HIGH;
     m_rangeLow = RANGE_MIN;
     m_conversionLibInited = false;
-    m_input_frame_cnt = 0;
-    m_output_frame_cnt = 0;
+    m_decode_in_frames = 0;
+    m_decode_out_frames = 0;
     firstOutputFrameTimeUsec = 0;
     lastOutputFrameRate = 0.0;
     lastReportDurationSecond = 0;
     realSpotZoneCount = 4; // set the default value.
     copied_roisram_4_anchorX = NULL_POINTER;
     p_misc_device = qApp->get_misc_dev_instance();
-    init_frame_checker(&flc);
     skip_frame_decode = Utils::is_env_var_true(ENV_VAR_SKIP_FRAME_DECODE);
     dump_ptm_frame_headinfo_times = Utils::get_env_var_intvalue(ENV_VAR_DUMP_PTM_FRAME_HEADINFO_TIMES);
-    invalid_sram_id_frames = 0;
+    unexpected_sram_id_cnt = 0;
+    min_costtime_4_frame_decode = 0xFFFF; // set a enough big value as initially, so that it must be re-assgined value.
+    max_costtime_4_frame_decode = 0; // set a 0 value as initially, so that it must be re-assgined value.
+
+    first_frame_sequence = 0xFFFFFFFF; // set the initial value to max, to force it be re-assigned a real value when first frame (whose frame sequence may not be 0, because of possible frame-drop) is handled
+    rx_frame_cnt = 0;
+    lost_frame_cnt = 0;
+    lost_frame_ratio = 0.0f;           // %, percent
+    last_frame_id = 0;
 }
 
 ADAPS_DTOF::~ADAPS_DTOF()
 {
-    DBG_NOTICE("------decode statistics------work_mode: %d, in_frm_cnt: %d, out_frm_cnt: %d, decoded_rate: %d, flc.total_frames: %d, flc.dropped_frames: %d, invalid_sram_id_frames: %d---\n",
-        set_param.work_mode, m_input_frame_cnt, m_output_frame_cnt, m_input_frame_cnt/m_output_frame_cnt, flc.total_frames, flc.dropped_frames, invalid_sram_id_frames);
+    DBG_NOTICE("------decode statistics------work_mode: %d, decode_in_frames: %d, decode_out_frames: %d, decoded_rate: %d, rx_frames: %d, lost_frames: %d, lost_ratio: %.02f%%, unexpected_sram_id_cnt: %d---\n",
+        set_param.work_mode, m_decode_in_frames, m_decode_out_frames, m_decode_in_frames/m_decode_out_frames, rx_frame_cnt, lost_frame_cnt, lost_frame_ratio, unexpected_sram_id_cnt);
+
+    if (true == Utils::is_env_var_true(ENV_VAR_TRACE_ALGO_LIB_DECODE_COSTTIME))
+    {
+        DBG_NOTICE("------decode statistics2------work_mode: %d, decode_in_frames: %d, decode_out_frames: %d, costtime_4_frame_decode_max:%d, min:%d us---\n",
+            set_param.work_mode, m_decode_in_frames, m_decode_out_frames, max_costtime_4_frame_decode, min_costtime_4_frame_decode);
+    }
+
     p_misc_device = NULL_POINTER;
     if (NULL_POINTER != copied_roisram_4_anchorX)
     {
@@ -45,60 +59,31 @@ ADAPS_DTOF::~ADAPS_DTOF()
     }
 }
 
-// Initialize the frame loss checker
-void ADAPS_DTOF::init_frame_checker(FrameLossChecker *checker)
-{
-    checker->last_id = 0;
-    checker->first_frame = 1;
-    checker->total_frames = 0;
-    checker->dropped_frames = 0;
-}
-
 // Check if frames are dropped for the new frame
 // Returns: Number of dropped frames (0 = no loss, >0 = number of dropped frames)
-int ADAPS_DTOF::check_frame_loss(FrameLossChecker *checker, const unsigned char *buffer, size_t buffer_size)
+int ADAPS_DTOF::ptm_frame_loss_check(uint8_t current_id, uint8_t last_id)
 {
-    if (buffer == NULL || buffer_size < 3) {
-        return -1;  // Invalid input
-    }
-
-    unsigned char current_id = buffer[2];
     int lost_count = 0;
 
-    if (checker->first_frame) {
-        checker->first_frame = 0;
-    } else {
-        // Calculate the expected ID of the next frame
-        unsigned char expected_id = (checker->last_id + 1) & 0xFF;
-        
-        // Calculate the number of dropped frames
-        if (current_id != expected_id) {
-            if (current_id > expected_id) {
-                lost_count = current_id - expected_id;
-            } else {
-                lost_count = 256 - (expected_id - current_id);
-            }
-            checker->dropped_frames += lost_count;
+    // Calculate the expected ID of the next frame
+    unsigned char expected_id = (last_id + 1) & 0xFF;
+    
+    // Calculate the number of dropped frames
+    if (current_id != expected_id) {
+        if (current_id > expected_id) {
+            lost_count = current_id - expected_id;
+        } else {
+            lost_count = 256 - (expected_id - current_id);
         }
     }
 
-    checker->last_id = current_id;
-    checker->total_frames++;
     return lost_count;
 }
 
-// Get the frame loss rate (percentage)
-float ADAPS_DTOF::get_frame_loss_rate(const FrameLossChecker *checker)
+bool ADAPS_DTOF::ptm_frame_head_check(const uint8_t* raw_data, uint32_t frame_seq, bool roi_sram_rolling)
 {
-    if (checker->total_frames <= 1) {
-        return 0.0f;
-    }
-    return (float)checker->dropped_frames / 
-           (float)(checker->total_frames - 1) * 100.0f;
-}
+    uint8_t losing_frame_cnt = 0;
 
-bool ADAPS_DTOF::frame_head_valid_check(const uint8_t* raw_data, uint32_t frame_seq, bool roi_sram_rolling)
-{
     if (raw_data == NULL) {
         DBG_ERROR("Invalid input: raw_data is NULL");
         return false;
@@ -107,6 +92,36 @@ bool ADAPS_DTOF::frame_head_valid_check(const uint8_t* raw_data, uint32_t frame_
     uint8_t sram_id = raw_data[0];
     uint8_t zone_id = raw_data[1];
     uint8_t frame_id = raw_data[2];
+
+    rx_frame_cnt++;
+
+    if (first_frame_sequence == 0xFFFFFFFF) // first time
+    {
+        first_frame_sequence = frame_seq;
+        if (0 != frame_id)
+        {
+            losing_frame_cnt = frame_id;
+            DBG_ERROR("FRAME_LOSS check failed! first frame_id: %d, First %d frames is lost!", frame_id, losing_frame_cnt);
+        }
+    }
+    else {
+        losing_frame_cnt = ptm_frame_loss_check(frame_id, last_frame_id);
+    }
+    lost_frame_cnt += losing_frame_cnt;
+    lost_frame_ratio = (float) lost_frame_cnt / (float)(lost_frame_cnt + rx_frame_cnt) * 100.0f;
+
+    if (0 != losing_frame_cnt)
+    {
+        DBG_ERROR("--Oops-- %d frame(s) is being lost, cur_frame_id: %d, last_frame_id: %d, lost_frames: %d, rx_frames: %d, lost_ratio: %.02f%%\n", 
+            losing_frame_cnt,
+            frame_id,
+            last_frame_id, 
+            lost_frame_cnt,
+            rx_frame_cnt,
+            lost_frame_ratio
+            );
+    }
+    last_frame_id = frame_id;
 
     if (roi_sram_rolling)
     {
@@ -120,7 +135,7 @@ bool ADAPS_DTOF::frame_head_valid_check(const uint8_t* raw_data, uint32_t frame_
 
         if (sram_id != expected_sram_id) {
             DBG_ERROR("SRAM_ID check failed! Frame_seq: %u, Expected: %u, Actual: %u", frame_seq, expected_sram_id, sram_id);
-            invalid_sram_id_frames++;
+            unexpected_sram_id_cnt++;
             return false;
         }
     }
@@ -1142,7 +1157,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
                 if (Utils::is_env_var_true(ENV_VAR_DUMP_SPOT_DEPTH))
                 {
                     DBG_NOTICE("### frm_cnt: %d,Spot(%d, %d) distance: %d mm, confidence: %d, non_zero_depth_count: %d, bgrColor(%d, %d, %d)",
-                        m_input_frame_cnt, i, j, distance, confidence, non_zero_depth_count, bgrColor.Blue, bgrColor.Green, bgrColor.Red);
+                        m_decode_in_frames, i, j, distance, confidence, non_zero_depth_count, bgrColor.Blue, bgrColor.Green, bgrColor.Red);
                 }
             }
             else { // Show as colors[4]
@@ -1152,7 +1167,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
 
                 if (Utils::is_env_var_true(ENV_VAR_DUMP_SPOT_DEPTH))
                 {
-                    DBG_NOTICE("--- frm_cnt: %d, Spot(%d, %d) distance: %d mm, confidence: %d, non_zero_depth_count: %d", m_input_frame_cnt, i, j, distance, confidence, non_zero_depth_count);
+                    DBG_NOTICE("--- frm_cnt: %d, Spot(%d, %d) distance: %d mm, confidence: %d, non_zero_depth_count: %d", m_decode_in_frames, i, j, distance, confidence, non_zero_depth_count);
                 }
             }
 #endif
@@ -1181,7 +1196,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
                     if (Utils::is_env_var_true(ENV_VAR_DUMP_MID_CONF_ENABLE))
                     {
                         DBG_NOTICE("frm_cnt: %d, non_zero_depth_count: %d, Spot(%d, %d) depth16: 0x%x, distance: %d mm, confidence: %d", 
-                            m_input_frame_cnt, non_zero_depth_count, i, j, depth16_buffer[rawImgIdx], distance, confidence);
+                            m_decode_in_frames, non_zero_depth_count, i, j, depth16_buffer[rawImgIdx], distance, confidence);
                     }
                     depth_confidence_map[rawImgIdx * 3 + 0] = 0xFF; //Red;
                     depth_confidence_map[rawImgIdx * 3 + 1] = 0xFF; //Green;
@@ -1197,7 +1212,7 @@ void ADAPS_DTOF::ConvertDepthToColoredMap(const u16 depth16_buffer[], u8 depth_c
         }
     }
 
-    DBG_INFO("### frame_%d non_zero_depth_count: %d, set_param.expand_pixel: %d", m_input_frame_cnt, non_zero_depth_count, set_param.expand_pixel);
+    DBG_INFO("### frame_%d non_zero_depth_count: %d, set_param.expand_pixel: %d", m_decode_in_frames, non_zero_depth_count, set_param.expand_pixel);
 }
 
 void ADAPS_DTOF::ConvertGreyscaleToColoredMap(u16 depth16_buffer[], u8 greyscale_colored_map[], int outImgWidth, int outImgHeight)
@@ -1429,17 +1444,9 @@ int ADAPS_DTOF::dtof_frame_decode(
 
     if (WK_DTOF_PCM != swk)
     {
-        bool valid = frame_head_valid_check(frm_rawdata, frm_sequence, qApp->is_roi_sram_rolling());
+        bool valid = ptm_frame_head_check(frm_rawdata, frm_sequence, qApp->is_roi_sram_rolling());
         if (false == valid) {
             DBG_ERROR("Found invalid frame head for frm_sequence: %d\n", frm_sequence);
-        }
-
-        if (true == Utils::is_env_var_true(ENV_VAR_FRAME_DROP_CHECK_ENABLE))
-        {
-            int lost = check_frame_loss(&flc, frm_rawdata, frm_rawdata_size);
-            if (lost > 0) {
-                DBG_ERROR("lost %d frames, last_id: %d, frm_sequence: %d\n", lost, flc.last_id, frm_sequence);
-            }
         }
     }
 
@@ -1473,7 +1480,7 @@ int ADAPS_DTOF::dtof_frame_decode(
 
         PrepareFrameParam(&depthConfig);
     
-        if (0 == m_input_frame_cnt)
+        if (0 == m_decode_in_frames)
         {
             DBG_INFO("sizeof(WrapperDepthOutput): %ld, sizeof(struct SpotPoint): %ld\n", sizeof(WrapperDepthOutput), sizeof(struct SpotPoint));
         }
@@ -1485,30 +1492,37 @@ int ADAPS_DTOF::dtof_frame_decode(
                                     &depthConfig,
                                     req_output_stream_cnt,
                                     depthOutputs);
-        m_input_frame_cnt++;
+        m_decode_in_frames++;
 
         if (true == Utils::is_env_var_true(ENV_VAR_TRACE_ALGO_LIB_DECODE_COSTTIME))
         {
             gettimeofday(&tv,NULL_POINTER);
             timeUs = tv.tv_sec*1000000 + tv.tv_usec;
             timeUs = (timeUs - FrameDecStartTimeUsec);
+
+            if (timeUs > max_costtime_4_frame_decode)
+                max_costtime_4_frame_decode= timeUs;
+            
+            if (timeUs < min_costtime_4_frame_decode)
+                min_costtime_4_frame_decode = timeUs;
+
             if (WK_DTOF_PCM == swk)
             {
-                DBG_NOTICE("FrameDecode() return %d for mipi frame: %d, cost time: %lu us, input_frm_cnt: %d, output_frm_cnt: %d\n",
-                    done, frm_sequence, timeUs, m_input_frame_cnt, m_output_frame_cnt);
+                DBG_NOTICE("FrameDecode() return %d for mipi frame: %d, cost time: %lu us, decode_in_frames: %d, decode_out_frames: %d\n",
+                    done, frm_sequence, timeUs, m_decode_in_frames, m_decode_out_frames);
             }
             else {
-                DBG_NOTICE("FrameDecode() return %d for mipi frame: %d [sram_id: %d, zone_id: %d, frame_id: %d], cost time: %lu us, work_mode: %d, input_frm_cnt: %d, output_frm_cnt: %d\n",
-                    done, frm_sequence, frm_rawdata[0], frm_rawdata[1], frm_rawdata[2], timeUs, swk, m_input_frame_cnt, m_output_frame_cnt);
+                DBG_NOTICE("FrameDecode() return %d for mipi frame: %d [sram_id: %d, zone_id: %d, frame_id: %d], cost time: %lu us, work_mode: %d, decode_in_frames: %d, decode_out_frames: %d\n",
+                    done, frm_sequence, frm_rawdata[0], frm_rawdata[1], frm_rawdata[2], timeUs, swk, m_decode_in_frames, m_decode_out_frames);
             }
         }
     }
     else {
-        m_input_frame_cnt++;
+        m_decode_in_frames++;
 
         if (WK_DTOF_PCM != swk)
         {
-            if(m_input_frame_cnt % sub_frame_cnt_per_image_frame == 0)
+            if(m_decode_in_frames % sub_frame_cnt_per_image_frame == 0)
                 done = 1;
             else
                 done = 0;
@@ -1520,12 +1534,12 @@ int ADAPS_DTOF::dtof_frame_decode(
 
     if (true == done)
     {
-        m_output_frame_cnt++;
+        m_decode_out_frames++;
 
         if ((true == Utils::is_env_var_true(ENV_VAR_TRACE_OUTPUT_FRAME_RATE)) && (WK_DTOF_PCM != swk))
         {
             gettimeofday(&tv,NULL_POINTER);
-            if (1 == m_output_frame_cnt)
+            if (1 == m_decode_out_frames)
             {
                 firstOutputFrameTimeUsec = tv.tv_sec*1000000 + tv.tv_usec;
             }
@@ -1534,11 +1548,11 @@ int ADAPS_DTOF::dtof_frame_decode(
                 unsigned long currTimeUsec, durationSecond;
                 currTimeUsec = tv.tv_sec*1000000 + tv.tv_usec;
                 durationSecond = ((currTimeUsec - firstOutputFrameTimeUsec)/1000000);
-                cur_fps = (float) (m_output_frame_cnt - 1) / durationSecond;
+                cur_fps = (float) (m_decode_out_frames - 1) / durationSecond;
                 if ((cur_fps < FPS_THRESHOLD_TO_WARNING) || (abs(lastOutputFrameRate - cur_fps) > 1.0) || ((durationSecond - lastReportDurationSecond) > FPS_REPORT_INTERVAL))
                 {
-                    DBG_NOTICE("Final_output_fps: %f (%f), m_input_frame_cnt: %d, output_frm_cnt: %d, streaming-duration: %ld seconds.\n",
-                        cur_fps, lastOutputFrameRate, m_input_frame_cnt, m_output_frame_cnt, durationSecond);
+                    DBG_NOTICE("Final_output_fps: %f (%f), m_decode_in_frames: %d, output_frm_cnt: %d, streaming-duration: %ld seconds.\n",
+                        cur_fps, lastOutputFrameRate, m_decode_in_frames, m_decode_out_frames, durationSecond);
                     lastOutputFrameRate = cur_fps;
                     lastReportDurationSecond = durationSecond;
                 }

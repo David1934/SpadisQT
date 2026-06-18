@@ -68,14 +68,6 @@ struct BGRColor
     u8 Red;
 };
 
-// Frame loss checking state structure
-typedef struct {
-    unsigned char last_id;      // ID of the last frame
-    int first_frame;            // Flag indicating first frame (initial state)
-    unsigned int total_frames;  // Total frame count
-    unsigned int dropped_frames;// Count of dropped frames
-} FrameLossChecker;
-
 class ADAPS_DTOF
 {
 
@@ -119,12 +111,11 @@ private:
     char m_DepthLibversion[32];
     char m_DepthLibConfigXmlPath[128];
     bool m_conversionLibInited;
-    uint32_t m_input_frame_cnt;
-    uint32_t m_output_frame_cnt;
+    uint32_t m_decode_in_frames;
+    uint32_t m_decode_out_frames;
     WrapperDepthOutput depthOutputs[MAX_DEPTH_OUTPUT_FORMATS];
     WrapperDepthInput depthInput;
     WrapperDepthCamConfig depthConfig;
-    FrameLossChecker flc;
     void* loaded_roi_sram_data;
     uint8_t* copied_roisram_4_anchorX;
     uint32_t loaded_roi_sram_size;
@@ -135,9 +126,16 @@ private:
     unsigned long lastReportDurationSecond;
     uint8_t realSpotZoneCount;
     volatile uint32_t dump_ptm_frame_headinfo_times;
-    uint32_t invalid_sram_id_frames;
+    uint32_t unexpected_sram_id_cnt;
+    uint16_t min_costtime_4_frame_decode;
+    uint16_t max_costtime_4_frame_decode;
 
     u8 frameCoordinatesMap[OUTPUT_HEIGHT_4_DTOF_SENSOR][OUTPUT_WIDTH_4_DTOF_SENSOR];
+    u32 first_frame_sequence;
+    u8 last_frame_id;      // ID of the last frame
+    u32 rx_frame_cnt;
+    u32 lost_frame_cnt;
+    float lost_frame_ratio;           // %, percent
 
     void roisram_anchor_preproccess(uint8_t *roisram_buf, uint32_t roisram_buf_size);
     int FillSetWrapperParamFromEepromInfo(uint8_t* pEEPROMData, SetWrapperParam* setparam, WrapperDepthInitInputParams* initInputParams);
@@ -147,10 +145,8 @@ private:
     void Distance_2_BGRColor(int bucketNum, float bucketSize, u16 distance, struct BGRColor *destColor);
     int roiCoordinatesDumpCheck(uint8_t* roi_sram_data, int outImgWidth, int outImgHeight, int roisram_group_index);
     int multipleRoiCoordinatesDumpCheck(uint8_t* multiple_roi_sram_data, u16 length, int outImgWidth, int outImgHeight);
-    void init_frame_checker(FrameLossChecker *checker);
-    int check_frame_loss(FrameLossChecker *checker, const unsigned char *buffer, size_t buffer_size);
-    float get_frame_loss_rate(const FrameLossChecker *checker);
-    bool frame_head_valid_check(const uint8_t* raw_data, uint32_t frame_seq, bool roi_sram_rolling);
+    int ptm_frame_loss_check(uint8_t current_id, uint8_t last_id);
+    bool ptm_frame_head_check(const uint8_t* raw_data, uint32_t frame_seq, bool roi_sram_rolling);
 #if defined(ENABLE_HISTOGRAM_RAW_OUTPUT)
     int get_histogram_data(unsigned int frm_sequence, WrapperDepthOutput *output, struct SpotHistogram hist[], int *HistCountToGet);
     void save_histogram_to_file(OUT_HISTOGRAM_TYPE hist_buf[], uint8_t x, uint8_t y);
