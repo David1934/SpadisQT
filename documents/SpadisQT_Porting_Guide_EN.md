@@ -185,6 +185,22 @@ Other common keys:
 
 > For RK3568 boards make sure it's `1280 / 4352`. The XML shipped in this repo already uses the RK values.
 
+### Deriving the widths for an unlisted SoC
+
+If your SoC isn't in the table, measure it on hardware. `BufferWidthFHR` must equal the
+**total bytes per MIPI line** (payload + padding) that the V4L2 driver actually delivers —
+not the payload width. `V4L2::Capture_frame()` (`v4l2.cpp`) computes it on the first frame
+as `total_bytes_per_line = bytesused / raw_height` and logs it. Run the app once and read the
+`NOTICE` line, e.g. on RK3568:
+
+```
+------frame raw size: 4104 X 32, bits_per_pixel: 8, payload_bytes_per_line: 4104, total_bytes_per_line: 4352, padding_bytes_per_line: 248, frame_buffer_size: 139264---
+```
+
+Here `total_bytes_per_line = 4352`, so set `BufferWidthFHR = 4352` (the 248 padding bytes
+make the line longer than the 4104-byte payload; the algo library needs the padded width to
+step to the next row correctly). Derive `BufferWidthPHR` the same way from a PHR-mode capture.
+
 ---
 
 ## 7. Step 5 — Deploy to the board
