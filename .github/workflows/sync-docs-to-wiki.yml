@@ -44,6 +44,7 @@ jobs:
       - name: Render docs into wiki tree
         env:
           REPO_BLOB_URL: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}
+          WIKI_RAW_BASE: https://raw.githubusercontent.com/wiki/${{ github.repository }}
         run: python3 tools/sync_docs_to_wiki.py "$PWD" "$PWD/wiki"
 
       - name: Commit & push wiki
