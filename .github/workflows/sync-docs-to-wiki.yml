@@ -16,7 +16,7 @@ on:
       - 'docs/**'
       - 'documents/**'
       - 'vx_images/**'
-      - 'tools/sync_docs_to_wiki.sh'
+      - 'tools/sync_docs_to_wiki.py'
       - '.github/workflows/sync-docs-to-wiki.yml'
   workflow_dispatch: {}
 
@@ -44,7 +44,7 @@ jobs:
       - name: Render docs into wiki tree
         env:
           REPO_BLOB_URL: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}
-        run: bash tools/sync_docs_to_wiki.sh "$PWD" "$PWD/wiki"
+        run: python3 tools/sync_docs_to_wiki.py "$PWD" "$PWD/wiki"
 
       - name: Commit & push wiki
         working-directory: wiki
