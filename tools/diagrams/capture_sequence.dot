@@ -1,0 +1,44 @@
+// SpadisQT single-frame capture & decode sequence (top to bottom).
+// Canonical source — render with tools/gen_diagrams.sh (do not edit the generated PNG/SVG by hand).
+digraph SpadisQT_CaptureSequence {
+    rankdir=TB;
+    bgcolor="white";
+    node  [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", penwidth=1.2];
+    edge  [fontname="DejaVu Sans", fontsize=9, color="#555555"];
+    graph [fontname="DejaVu Sans Bold", fontsize=13, labelloc=t, nodesep=0.3, ranksep=0.45,
+           label="SpadisQT — one frame: capture -> decode -> display / upload"];
+
+    start  [label="FrameProcessThread::run()\ncapture loop", shape=ellipse, fillcolor="#f8c471"];
+    poll   [label="V4L2::Capture_frame()\npoll(/dev/video0)", fillcolor="#fdebd0"];
+    deq    [label="VIDIOC_DQBUF\nmmap raw MIPI frame", fillcolor="#fdebd0"];
+    emit1  [label="emit rx_new_frame(...)", fillcolor="#fadbd8", color="#e74c3c"];
+    handle [label="new_frame_handle()\n(direct connection)", fillcolor="#fdebd0"];
+
+    skipq  [label="skip_frame_decode ?", shape=diamond, fillcolor="#fcf3cf"];
+    decode [label="ADAPS_DTOF::dtof_frame_decode()\n-> depth16 / grayscale /\n   point cloud / histogram", fillcolor="#fdebd0"];
+    raw    [label="raw passthrough\n(no decode)", fillcolor="#f2f3f4"];
+
+    guiq   [label="GUI build ?", shape=diamond, fillcolor="#fcf3cf"];
+    color  [label="ConvertDepthToColoredMap()\n-> QImage (RGB)", fillcolor="#fdebd0"];
+    emit2  [label="emit newFrameReady4Display()\n-> MainWindow", fillcolor="#fadbd8", color="#e74c3c"];
+
+    hostq  [label="host upload\nrequested ?", shape=diamond, fillcolor="#fcf3cf"];
+    upload [label="Host_Communication::\nupload_frame_*()  -> host PC", fillcolor="#fdebd0"];
+
+    reqbuf [label="VIDIOC_QBUF\nre-queue buffer", fillcolor="#fdebd0"];
+    loop   [label="next frame", shape=ellipse, fillcolor="#f8c471"];
+
+    start -> poll -> deq -> emit1 -> handle -> skipq;
+    skipq -> decode [label="no"];
+    skipq -> raw    [label="yes"];
+    decode -> guiq;
+    raw    -> hostq;
+    guiq -> color  [label="yes"];
+    color -> emit2 -> hostq;
+    guiq -> hostq  [label="no (console)"];
+    hostq -> upload [label="yes"];
+    upload -> reqbuf;
+    hostq -> reqbuf [label="no"];
+    reqbuf -> loop;
+    loop -> poll [style=dashed, constraint=false, label="repeat"];
+}

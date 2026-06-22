@@ -1,0 +1,67 @@
+// SpadisQT system architecture (layered).
+// Canonical source — render with tools/gen_diagrams.sh (do not edit the generated PNG/SVG by hand).
+digraph SpadisQT_Architecture {
+    rankdir=TB;
+    bgcolor="white";
+    node  [fontname="DejaVu Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.2];
+    edge  [fontname="DejaVu Sans", fontsize=9, color="#555555"];
+    graph [fontname="DejaVu Sans Bold", fontsize=13, labelloc=t, nodesep=0.35, ranksep=0.55,
+           label="SpadisQT — layered architecture"];
+
+    // ---------- Host PC (optional) ----------
+    subgraph cluster_host {
+        label="Host PC  (optional)";
+        style="rounded,filled"; color="#9b59b6"; fillcolor="#f5eef8"; fontcolor="#6c3483";
+        hosttool [label="ADAPS Host Tool\n(SpadisPC upper-computer)", fillcolor="#e8daef"];
+    }
+
+    // ---------- Application process ----------
+    subgraph cluster_app {
+        label="SpadisQT  /  SpadisQT_console   (userspace process)";
+        style="rounded,filled"; color="#e67e22"; fillcolor="#fef5e7"; fontcolor="#b9770e";
+
+        global  [label="GlobalApplication\n(global state / registry, qApp)", fillcolor="#fdebd0"];
+        mainwin [label="MainWindow\n(GUI display; console = QObject)", fillcolor="#fdebd0"];
+        fpt     [label="FrameProcessThread\n(capture + decode worker QThread)", fillcolor="#f8c471"];
+        v4l2    [label="V4L2\n(MIPI capture)", fillcolor="#fdebd0"];
+        dtof    [label="ADAPS_DTOF\n(decode + color map)", fillcolor="#fdebd0"];
+        misc    [label="Misc_Device\n(ioctl to /dev/ads6401)", fillcolor="#fdebd0"];
+        hostc   [label="Host_Communication\n(singleton, host bridge)", fillcolor="#fdebd0"];
+    }
+
+    // ---------- Prebuilt closed-source libs ----------
+    subgraph cluster_libs {
+        label="Prebuilt closed-source libraries  (aarch64, /vendor/lib64)";
+        style="rounded,filled"; color="#7f8c8d"; fillcolor="#f2f3f4"; fontcolor="#566573";
+        algolib   [label="libadaps_swift_decode.so\n(raw -> depth16 / grayscale / point cloud)", fillcolor="#e5e7e9"];
+        senderlib [label="libAdapsSender.so\n(host transport)", fillcolor="#e5e7e9"];
+    }
+
+    // ---------- Kernel ----------
+    subgraph cluster_kernel {
+        label="Linux kernel  (5.10)";
+        style="rounded,filled"; color="#2980b9"; fillcolor="#ebf5fb"; fontcolor="#1f618d";
+        v4l2drv  [label="V4L2 / media subsystem\n/dev/video0  /dev/media0", fillcolor="#d4e6f1"];
+        adsdrv   [label="ads6401 driver\n/dev/ads6401 (control ioctls)", fillcolor="#d4e6f1"];
+    }
+
+    // ---------- Hardware ----------
+    sensor [label="ADS6401 dToF sensor module\n(Spot / Flood / Big-FoV Flood / V2)", fillcolor="#aed6f1", shape=box3d];
+
+    // ---------- Edges ----------
+    mainwin -> fpt   [label="start / stop", style=dashed];
+    fpt -> v4l2      [label="owns"];
+    fpt -> dtof      [label="owns"];
+    fpt -> mainwin   [label="newFrameReady4Display", color="#e74c3c", fontcolor="#c0392b"];
+    fpt -> hostc     [label="upload_frame_*()"];
+    global -> v4l2   [style=dotted, label="registry", constraint=false];
+    global -> misc   [style=dotted, constraint=false];
+    hostc -> hosttool [label="commands / frames", dir=both, color="#8e44ad", fontcolor="#6c3483"];
+    hostc -> senderlib;
+    dtof -> algolib  [dir=both];
+    dtof -> misc     [label="EEPROM / params"];
+    v4l2 -> v4l2drv  [label="VIDIOC_* / mmap / poll"];
+    misc -> adsdrv   [label="ioctl"];
+    v4l2drv -> sensor [label="MIPI-CSI"];
+    adsdrv -> sensor  [label="I2C / control"];
+}
