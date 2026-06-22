@@ -25,6 +25,11 @@ import sys
 SRC = os.path.abspath(sys.argv[1])
 WIKI = os.path.abspath(sys.argv[2])
 REPO_BLOB_URL = os.environ.get("REPO_BLOB_URL", "").rstrip("/")
+# GitHub Wiki does NOT resolve relative subdirectory asset paths from a page, so
+# images/PDFs must be referenced by their absolute raw wiki URL. The files are
+# still committed into the wiki repo (images/, vx_images/, root pdf) so the URL
+# resolves. e.g. https://raw.githubusercontent.com/wiki/OWNER/REPO
+WIKI_RAW_BASE = os.environ.get("WIKI_RAW_BASE", "").rstrip("/")
 
 # Internal files that must never be published to the public wiki.
 EXCLUDE = {"CLAUDE.md", "docs/CLAUDE.md"}
@@ -83,8 +88,9 @@ def rewrite_target(srcrel, target, pages):
     if resolved in pages:                       # internal doc page -> slug
         return pages[resolved] + (sep + anchor if sep else "")
     dest = asset_dest(resolved)
-    if dest is not None:                        # asset -> fixed wiki location
-        return dest + (sep + anchor if sep else "")
+    if dest is not None:                        # asset -> absolute raw wiki URL
+        url = f"{WIKI_RAW_BASE}/{dest}" if WIKI_RAW_BASE else dest
+        return url + (sep + anchor if sep else "")
     if REPO_BLOB_URL and not resolved.startswith(".."):
         return f"{REPO_BLOB_URL}/{resolved}" + (sep + anchor if sep else "")
     return target
