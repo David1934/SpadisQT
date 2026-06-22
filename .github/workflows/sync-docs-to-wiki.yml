@@ -1,0 +1,60 @@
+name: Sync docs to Wiki
+
+# Publishes the repo's Markdown docs to the GitHub Wiki on every push to main.
+# The wiki is a generated artifact — edit docs in the repo, never the wiki.
+#
+# Auth: uses the built-in GITHUB_TOKEN (needs `contents: write`) to push to this
+# repo's own wiki. If your org blocks GITHUB_TOKEN wiki pushes, create a PAT with
+# `repo` scope, add it as the secret WIKI_TOKEN, and it will be used instead.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'README_zh_CN.md'
+      - 'docs/**'
+      - 'documents/**'
+      - 'vx_images/**'
+      - 'tools/sync_docs_to_wiki.sh'
+      - '.github/workflows/sync-docs-to-wiki.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-docs-to-wiki
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Clone wiki
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+        run: |
+          TOKEN="${WIKI_TOKEN:-${{ github.token }}}"
+          git clone "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.wiki.git" wiki
+
+      - name: Render docs into wiki tree
+        env:
+          REPO_BLOB_URL: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}
+        run: bash tools/sync_docs_to_wiki.sh "$PWD" "$PWD/wiki"
+
+      - name: Commit & push wiki
+        working-directory: wiki
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Wiki already up to date — nothing to push."
+          else
+            git commit -m "docs(wiki): sync from ${{ github.repository }}@${{ github.sha }}"
+            git push
+          fi
