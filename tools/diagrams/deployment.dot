@@ -1,0 +1,40 @@
+// SpadisQT deployment / file layout.
+// Canonical source — render with tools/gen_diagrams.sh (do not edit the generated PNG/SVG by hand).
+digraph SpadisQT_Deployment {
+    rankdir=LR;
+    bgcolor="white";
+    node  [fontname="DejaVu Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.2];
+    edge  [fontname="DejaVu Sans", fontsize=10, color="#555555"];
+    graph [fontname="DejaVu Sans Bold", fontsize=13, labelloc=t, nodesep=0.3, ranksep=0.8,
+           label="SpadisQT — build & deployment layout"];
+
+    // ---- Build host ----
+    subgraph cluster_build {
+        label="Build host  (x86_64 Linux)";
+        style="rounded,filled"; color="#7f8c8d"; fillcolor="#f2f3f4"; fontcolor="#566573";
+        toolchain [label="aarch64 Qt5 cross-toolchain\nqmake + make", fillcolor="#e5e7e9"];
+        artifacts [label="Build output:\nSpadisQT, SpadisQT_console\n+ *.so + adapsdepthsettings.xml", shape=note, fillcolor="#fcf3cf"];
+        toolchain -> artifacts [label="build"];
+    }
+
+    // ---- Target board ----
+    subgraph cluster_board {
+        label="Target board  (RK3568, Linux 5.10, login root/rockchip)";
+        style="rounded,filled"; color="#2980b9"; fillcolor="#ebf5fb"; fontcolor="#1f618d";
+
+        bin   [label="/usr/bin/\n  SpadisQT\n  SpadisQT_console", fillcolor="#aed6f1"];
+        lib   [label="/vendor/lib64/\n  libadaps_swift_decode.so\n  libAdapsSender.so", fillcolor="#aed6f1"];
+        etc   [label="/vendor/etc/camera/\n  adapsdepthsettings.xml", fillcolor="#aed6f1"];
+        data  [label="/data/vendor/camera/\n  (runtime dump dir)", fillcolor="#d4e6f1"];
+        dev   [label="/dev/\n  video0  media0\n  ads6401", fillcolor="#d4e6f1"];
+
+        bin -> lib  [label="rpath /vendor/lib64", style=dashed, constraint=false];
+        bin -> etc  [label="reads config", style=dashed, constraint=false];
+        bin -> dev  [label="opens", style=dashed, constraint=false];
+        bin -> data [label="dumps", style=dashed, constraint=false];
+    }
+
+    artifacts -> bin [label="scp / adb push", color="#27ae60", fontcolor="#1e8449", penwidth=1.6];
+    artifacts -> lib [label="scp / adb push", color="#27ae60", fontcolor="#1e8449", penwidth=1.6];
+    artifacts -> etc [label="scp / adb push", color="#27ae60", fontcolor="#1e8449", penwidth=1.6];
+}

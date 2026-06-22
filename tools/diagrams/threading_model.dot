@@ -1,0 +1,38 @@
+// SpadisQT threading & signal/slot model.
+// Canonical source — render with tools/gen_diagrams.sh (do not edit the generated PNG/SVG by hand).
+digraph SpadisQT_Threading {
+    rankdir=LR;
+    bgcolor="white";
+    compound=true;
+    node  [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", penwidth=1.2];
+    edge  [fontname="DejaVu Sans", fontsize=9, color="#555555"];
+    graph [fontname="DejaVu Sans Bold", fontsize=13, labelloc=t, nodesep=0.35, ranksep=0.7,
+           label="SpadisQT — threads and Qt signal/slot connections"];
+
+    // ---- Main / GUI thread ----
+    subgraph cluster_main {
+        label="Main thread  (Qt event loop)";
+        style="rounded,filled"; color="#9b59b6"; fillcolor="#f5eef8"; fontcolor="#6c3483";
+        app     [label="GlobalApplication\n(QApplication / QCoreApplication)", fillcolor="#e8daef"];
+        mainwin [label="MainWindow\n(GUI; console = QObject)", fillcolor="#e8daef"];
+        hostc   [label="Host_Communication\n(singleton)", fillcolor="#e8daef"];
+    }
+
+    // ---- Worker thread ----
+    subgraph cluster_worker {
+        label="FrameProcessThread  (worker QThread)";
+        style="rounded,filled"; color="#e67e22"; fillcolor="#fef5e7"; fontcolor="#b9770e";
+        fpt   [label="run() capture loop", fillcolor="#f8c471"];
+        v4l2  [label="V4L2", fillcolor="#fdebd0"];
+        dtof  [label="ADAPS_DTOF", fillcolor="#fdebd0"];
+    }
+
+    // signals across threads (queued) and within (direct)
+    v4l2 -> fpt     [label="rx_new_frame\n(direct)", color="#e74c3c", fontcolor="#c0392b"];
+    fpt  -> dtof    [label="decode call"];
+    fpt  -> mainwin [label="newFrameReady4Display\n(queued)", color="#e74c3c", fontcolor="#c0392b", ltail=cluster_worker, lhead=cluster_main];
+    fpt  -> mainwin [label="update_runtime_display\n(queued)", color="#e74c3c", fontcolor="#c0392b", style=dashed];
+    hostc -> fpt    [label="start_capture / stop_capture\n(queued)", color="#8e44ad", fontcolor="#6c3483", lhead=cluster_worker, ltail=cluster_main];
+    mainwin -> fpt  [label="stop() / control", style=dashed];
+    fpt  -> hostc   [label="upload_frame_*()\n(direct call)"];
+}

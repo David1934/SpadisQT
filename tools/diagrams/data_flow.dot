@@ -1,0 +1,46 @@
+// SpadisQT frame data flow (left to right).
+// Canonical source — render with tools/gen_diagrams.sh (do not edit the generated PNG/SVG by hand).
+digraph SpadisQT_DataFlow {
+    rankdir=LR;
+    bgcolor="white";
+    node  [fontname="DejaVu Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.2];
+    edge  [fontname="DejaVu Sans", fontsize=9, color="#555555"];
+    graph [fontname="DejaVu Sans Bold", fontsize=14, labelloc=t, nodesep=0.4, ranksep=0.7,
+           label="SpadisQT frame pipeline:  raw MIPI -> depth / grayscale / point cloud -> display & host"];
+
+    sensor [label="ADS6401\nsensor", fillcolor="#aed6f1", shape=box3d];
+    v4l2   [label="V4L2\nmmap dequeue\n(/dev/video0)", fillcolor="#fdebd0"];
+    fpt    [label="FrameProcessThread\nrun() loop\n(QThread)", fillcolor="#f8c471"];
+    dtof   [label="ADAPS_DTOF\ndtof_frame_decode()", fillcolor="#fdebd0"];
+    algo   [label="libadaps_swift_decode.so\n(closed-source algo)", fillcolor="#e5e7e9"];
+
+    depth  [label="depth16 buffer\n(14-bit dist + 2-bit conf)", shape=note, fillcolor="#fcf3cf"];
+    gray   [label="grayscale buffer", shape=note, fillcolor="#fcf3cf"];
+    pcloud [label="point cloud\n(pc_pkt_t)", shape=note, fillcolor="#fcf3cf"];
+    hist   [label="spot histogram\n(SpotHistogram)", shape=note, fillcolor="#fcf3cf"];
+
+    colormap [label="ConvertDepthToColoredMap\n-> QImage (RGB)", fillcolor="#fdebd0"];
+    display  [label="MainWindow\nGUI display", fillcolor="#d2b4de"];
+    hostc    [label="Host_Communication\nupload_frame_*()", fillcolor="#fdebd0"];
+    host     [label="Host PC tool", fillcolor="#e8daef"];
+
+    sensor -> v4l2   [label="MIPI raw\nSBGGR8"];
+    v4l2   -> fpt    [label="rx_new_frame", color="#e74c3c", fontcolor="#c0392b"];
+    fpt    -> dtof   [label="raw buffer"];
+    dtof   -> algo   [label="DepthMapWrapperProcessFrame", dir=both];
+    dtof   -> depth;
+    dtof   -> gray;
+    dtof   -> pcloud;
+    dtof   -> hist;
+
+    depth  -> colormap;
+    colormap -> display [label="newFrameReady4Display", color="#e74c3c", fontcolor="#c0392b"];
+
+    depth  -> hostc  [style=dashed];
+    pcloud -> hostc  [style=dashed];
+    gray   -> hostc  [style=dashed];
+    hist   -> hostc  [style=dashed];
+    hostc  -> host   [label="libAdapsSender.so\nUSB / network", dir=both];
+
+    { rank=same; depth; gray; pcloud; hist; }
+}
