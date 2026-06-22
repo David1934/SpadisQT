@@ -185,6 +185,16 @@ qmake CONFIG+=debug SpadisQT.pro && make -j"$(nproc)"   # 调试期建议
 
 > 用 RK3568 的板子务必确认是 `1280 / 4352`。仓库里自带的 XML 已是 RK 值，可直接用。
 
+### 表外新 SoC 如何实测缓冲宽度
+
+如果你的 SoC 不在上表里，就到硬件上实测。`BufferWidthFHR` 必须等于 V4L2 驱动**实际给出的每行 MIPI 总字节数**（有效载荷 + padding），而不是有效载荷宽度。`V4L2::Capture_frame()`（`v4l2.cpp`）在第一帧时按 `total_bytes_per_line = bytesused / raw_height` 算出该值并打日志。运行一次应用，读 `NOTICE` 行，例如在 RK3568 上：
+
+```
+------frame raw size: 4104 X 32, bits_per_pixel: 8, payload_bytes_per_line: 4104, total_bytes_per_line: 4352, padding_bytes_per_line: 248, frame_buffer_size: 139264---
+```
+
+这里 `total_bytes_per_line = 4352`，即把 `BufferWidthFHR` 设为 `4352`（248 个 padding 字节让每行比 4104 字节的有效载荷更长；算法库需要这个带 padding 的宽度才能正确跳到下一行）。`BufferWidthPHR` 用 PHR 模式抓一帧、同法得出。
+
 ---
 
 ## 7. 第五步：部署到开发板
